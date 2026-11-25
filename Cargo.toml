@@ -6,6 +6,7 @@ members = [
   "crates/lk-generator",
   "crates/lk-totp",
   "crates/lk-vault",
+  "crates/lk-store",
 ]
 # Fuzz targets need a nightly toolchain and live in their own workspace.
 exclude = ["fuzz"]
@@ -28,6 +29,7 @@ lk-core = { path = "crates/lk-core" }
 lk-generator = { path = "crates/lk-generator" }
 lk-totp = { path = "crates/lk-totp" }
 lk-vault = { path = "crates/lk-vault" }
+lk-store = { path = "crates/lk-store" }
 
 # Cryptography (RustCrypto / dalek / rust-hpke). No custom primitives.
 argon2 = { version = "0.6.0", default-features = false, features = ["alloc", "zeroize"] }
@@ -56,8 +58,13 @@ serde = { version = "1.0.229", default-features = false, features = ["derive", "
 serde_json = { version = "1.0.154", default-features = false, features = ["alloc"] }
 uuid = { version = "1.29.3", default-features = false, features = ["serde"] }
 
+# Local storage: SQLite compiled from the bundled amalgamation (same version
+# on every platform, no dependency on the system library).
+rusqlite = { version = "0.43.0", default-features = false, features = ["bundled"] }
+
 # Test-only
 proptest = { version = "1.12.0", default-features = false, features = ["std"] }
+tempfile = { version = "3.27.0" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

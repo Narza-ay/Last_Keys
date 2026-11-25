@@ -423,6 +423,26 @@ impl AccountKeys {
         Ok(cert)
     }
 
+    /// Encrypts the local device identity under the account key, for storage
+    /// on this device. The device's private keys then become usable only
+    /// after an unlock. This is software protection; platform key stores
+    /// (hardware-backed where available) replace it in milestone M7.
+    ///
+    /// # Errors
+    /// Fails only if the OS RNG fails.
+    pub fn seal_device_identity(&self, device: &DeviceIdentity) -> Result<SealedDeviceIdentity> {
+        device.seal(&self.account_key)
+    }
+
+    /// Decrypts a device identity sealed with
+    /// [`AccountKeys::seal_device_identity`].
+    ///
+    /// # Errors
+    /// Fails if it was sealed by another account or tampered with.
+    pub fn open_device_identity(&self, sealed: &SealedDeviceIdentity) -> Result<DeviceIdentity> {
+        DeviceIdentity::open(sealed, &self.account_key)
+    }
+
     /// Revokes a device.
     ///
     /// # Errors

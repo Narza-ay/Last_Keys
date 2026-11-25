@@ -1,0 +1,24 @@
+[package]
+name = "lk-store"
+description = "Last Keys local encrypted store (SQLite): account bundle, device identity, vault keys, encrypted items, tombstones, offline change queue."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+lk-core.workspace = true
+rusqlite.workspace = true
+serde.workspace = true
+serde_json = { workspace = true, features = ["std"] }
+thiserror.workspace = true
+
+[dev-dependencies]
+lk-crypto.workspace = true
+lk-vault.workspace = true
+tempfile.workspace = true
+rusqlite.workspace = true
+
+[lints]
+workspace = true

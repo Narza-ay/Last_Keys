@@ -78,6 +78,11 @@ id_type!(
     /// Identifier of a vault item.
     ItemId
 );
+id_type!(
+    /// Identifier of one local change awaiting synchronization (makes sync
+    /// idempotent: a change replayed twice is applied once).
+    ChangeId
+);
 
 #[cfg(test)]
 mod tests {

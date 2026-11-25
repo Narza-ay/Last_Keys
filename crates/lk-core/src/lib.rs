@@ -31,5 +31,5 @@ pub use device::{
     Platform, SealedDeviceIdentity, trusted_devices,
 };
 pub use error::{CoreError, Result};
-pub use ids::{AccountId, DeviceId, ItemId, VaultId};
+pub use ids::{AccountId, ChangeId, DeviceId, ItemId, VaultId};
 pub use vault::{EncryptedItem, VaultKey, WrappedVaultKey};

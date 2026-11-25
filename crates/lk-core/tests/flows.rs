@@ -370,6 +370,17 @@ fn device_identity_storage_roundtrip() {
 }
 
 #[test]
+fn device_identity_sealed_under_account_key() {
+    let alice = create_account(&password("alice"), KdfParams::recommended()).unwrap();
+    let bob = create_account(&password("bob"), KdfParams::recommended()).unwrap();
+    let device = DeviceIdentity::generate().unwrap();
+    let sealed = alice.keys.seal_device_identity(&device).unwrap();
+    let restored = alice.keys.open_device_identity(&sealed).unwrap();
+    assert_eq!(restored.device_id(), device.device_id());
+    assert!(bob.keys.open_device_identity(&sealed).is_err());
+}
+
+#[test]
 fn device_names_are_bounded() {
     let device = DeviceIdentity::generate().unwrap();
     let long = "x".repeat(lk_core::device::MAX_DEVICE_NAME_BYTES + 1);
