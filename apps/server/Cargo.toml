@@ -32,6 +32,10 @@ thiserror.workspace = true
 
 [dev-dependencies]
 tower.workspace = true
+lk-sync.workspace = true
+lk-store.workspace = true
+lk-vault.workspace = true
+tempfile.workspace = true
 
 [lints]
 workspace = true

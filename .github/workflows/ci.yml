@@ -28,7 +28,7 @@ jobs:
         run: rustup toolchain install
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all -- --check
-      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
   test:
     name: Tests (${{ matrix.os }})
@@ -49,7 +49,7 @@ jobs:
         run: cargo test --workspace --locked --release --exclude lk-server
 
   server-tests:
-    name: Server integration tests (PostgreSQL 16)
+    name: Server, sync and end-to-end tests (PostgreSQL 16)
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -72,6 +72,8 @@ jobs:
         run: rustup toolchain install
       - uses: Swatinem/rust-cache@v2
       - run: cargo test -p lk-server --locked
+      - name: End-to-end CLI synchronization (two devices, real binary)
+        run: cargo test -p lk-cli --features server-e2e --test sync_e2e --locked
 
   wasm:
     name: WebAssembly build check

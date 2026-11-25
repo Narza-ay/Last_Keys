@@ -18,10 +18,14 @@ use std::process::ExitCode;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use clap::{Args, Parser, Subcommand};
-use lk_core::{AccountKeys, DeviceIdentity, Platform, VaultKey, create_account};
+use lk_core::{AccountKeys, DeviceIdentity, PasswordKeys, Platform, VaultKey, create_account};
 use lk_crypto::{KdfParams, MasterPassword, RecoveryKey};
 use lk_generator::{PassphrasePolicy, PasswordPolicy, generate_passphrase, generate_password};
+use lk_protocol::CredentialKind;
 use lk_store::{Store, StoredItem};
+use lk_sync::{
+    Api, SyncReport, UreqTransport, enroll_device, login_registered, register_account, sync_vault,
+};
 use lk_totp::Totp;
 use lk_vault::{
     ItemContent, ItemData, ItemKind, Login, PaymentCard, SecretString, SecureNote, codec,
@@ -104,6 +108,37 @@ enum Command {
     /// Recovery key management.
     #[command(subcommand)]
     Recovery(RecoveryCommand),
+    /// Register this vault's account on a sync server (asks for the master
+    /// password and the recovery key), then synchronize.
+    Register {
+        /// Server URL (https://…; http:// only for the local machine).
+        #[arg(long)]
+        server: String,
+        /// Account e-mail.
+        #[arg(long)]
+        email: String,
+    },
+    /// Set up this device from an account that already exists on a server.
+    Login {
+        /// Server URL.
+        #[arg(long)]
+        server: String,
+        /// Account e-mail.
+        #[arg(long)]
+        email: String,
+        /// Name of this device.
+        #[arg(long, default_value = "lk command line")]
+        device_name: String,
+    },
+    /// Synchronize with the server.
+    Sync,
+    /// List the account's devices (verified with the account key).
+    Devices,
+    /// Revoke a device (it immediately loses access to the server).
+    Revoke {
+        /// Device ID or ID prefix (at least 4 characters).
+        device: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -264,6 +299,11 @@ fn run(cli: Cli) -> Result<()> {
     match &cli.command {
         Command::Generate(args) => generate(args),
         Command::Init { device_name } => init(&path, &mut input, device_name),
+        Command::Login {
+            server,
+            email,
+            device_name,
+        } => login_new_device(&path, &mut input, server, email, device_name),
         command => {
             let mut session = Session::open(&path, &mut input, cli.recovery_key)?;
             match command {
@@ -277,7 +317,11 @@ fn run(cli: Cli) -> Result<()> {
                 Command::Totp { item } => session.totp(item),
                 Command::Passwd => session.passwd(&mut input),
                 Command::Recovery(RecoveryCommand::Rotate) => session.rotate_recovery(),
-                Command::Generate(_) | Command::Init { .. } => Ok(()),
+                Command::Register { server, email } => session.register(&mut input, server, email),
+                Command::Sync => session.sync().map(|_| ()),
+                Command::Devices => session.devices(),
+                Command::Revoke { device } => session.revoke(device),
+                Command::Generate(_) | Command::Init { .. } | Command::Login { .. } => Ok(()),
             }
         }
     }
@@ -339,6 +383,80 @@ fn init(path: &Path, input: &mut SecretInput, device_name: &str) -> Result<()> {
     print_recovery_key(&account.recovery_key)
 }
 
+/// Sets up this device from an existing account: enrollment with the master
+/// password, local store creation, initial synchronization.
+fn login_new_device(
+    path: &Path,
+    input: &mut SecretInput,
+    server: &str,
+    email: &str,
+    device_name: &str,
+) -> Result<()> {
+    if path.exists() {
+        return Err(fail(format!(
+            "a vault already exists at {}",
+            path.display()
+        )));
+    }
+    let email = lk_auth::normalize_email(email).map_err(|_| fail("invalid e-mail address"))?;
+    let api = Api::new(UreqTransport::new(server)?);
+    let password = MasterPassword::new(&input.read("Master password: ")?)?;
+    eprintln!("Deriving keys (Argon2id)...");
+    let device = DeviceIdentity::generate()?;
+    let now = now();
+    let enrollment = enroll_device(
+        &api,
+        &email,
+        &password,
+        &device,
+        device_name,
+        Platform::Cli,
+        now,
+    )?;
+    let vaults = api.vault_keys(&enrollment.session)?;
+    if vaults.is_empty() {
+        return Err(fail(
+            "the account has no vault on the server yet; run `lk sync` on a registered device first",
+        ));
+    }
+    if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+        let mut builder = std::fs::DirBuilder::new();
+        builder.recursive(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::DirBuilderExt;
+            builder.mode(0o700);
+        }
+        builder.create(parent)?;
+    }
+    let sealed = enrollment.keys.seal_device_identity(&device)?;
+    let mut store = Store::create(
+        path,
+        &enrollment.bundle,
+        &sealed,
+        Some(&enrollment.certificate),
+        now,
+    )?;
+    store.set_remote(&lk_sync::normalize_server_url(server)?, &email)?;
+    let mut received = 0usize;
+    for wrapped in &vaults {
+        store.put_wrapped_vault_key(wrapped)?;
+        let vault = enrollment.keys.open_vault_key(wrapped)?;
+        let report = sync_vault(&api, &enrollment.session, &mut store, &vault, wrapped, now)?;
+        received = received.saturating_add(report.pulled);
+    }
+    let _ = api.logout(&enrollment.session);
+    println!(
+        "Device {} enrolled on {server} as {email}.",
+        device.device_id()
+    );
+    println!(
+        "Vault created: {} ({received} item(s) received)",
+        path.display()
+    );
+    Ok(())
+}
+
 fn generate(args: &GenerateArgs) -> Result<()> {
     let generated = if args.passphrase {
         generate_passphrase(&PassphrasePolicy {
@@ -398,6 +516,11 @@ struct Session {
     store: Store,
     keys: AccountKeys,
     vault: VaultKey,
+    device: DeviceIdentity,
+    /// Present when unlocked with the master password.
+    password_keys: Option<PasswordKeys>,
+    /// Present when unlocked with the recovery key.
+    recovery_key: Option<RecoveryKey>,
 }
 
 impl Session {
@@ -410,21 +533,194 @@ impl Session {
         }
         let store = Store::open(path)?;
         let bundle = store.account_bundle()?;
-        let keys = if use_recovery_key {
+        let (keys, password_keys, recovery_key) = if use_recovery_key {
             let text = input.read("Recovery key: ")?;
-            bundle.unlock_with_recovery_key(&RecoveryKey::parse(&text)?)?
+            let rk = RecoveryKey::parse(&text)?;
+            (bundle.unlock_with_recovery_key(&rk)?, None, Some(rk))
         } else {
             let pw = input.read("Master password: ")?;
-            bundle.unlock_with_password(&MasterPassword::new(&pw)?)?
+            let pkeys = PasswordKeys::derive(&MasterPassword::new(&pw)?, &bundle.kdf)?;
+            (bundle.unlock_with_password_keys(&pkeys)?, Some(pkeys), None)
         };
         // Integrity check of the local device identity.
-        keys.open_device_identity(&store.sealed_device()?)?;
+        let device = keys.open_device_identity(&store.sealed_device()?)?;
         let wrapped = store.wrapped_vault_keys()?;
         let first = wrapped
             .first()
             .ok_or_else(|| fail("the store contains no vault"))?;
         let vault = keys.open_vault_key(first)?;
-        Ok(Self { store, keys, vault })
+        Ok(Self {
+            store,
+            keys,
+            vault,
+            device,
+            password_keys,
+            recovery_key,
+        })
+    }
+
+    fn remote(&self) -> Result<Option<(Api<UreqTransport>, String)>> {
+        match self.store.remote()? {
+            Some((url, email)) => Ok(Some((Api::new(UreqTransport::new(&url)?), email))),
+            None => Ok(None),
+        }
+    }
+
+    fn remote_required(&self) -> Result<(Api<UreqTransport>, String)> {
+        self.remote()?.ok_or_else(|| {
+            fail("this vault is not registered on a server (use `lk register` or `lk login`)")
+        })
+    }
+
+    fn full_session(&self, api: &Api<UreqTransport>, email: &str) -> Result<lk_sync::Session> {
+        let keys = self.password_keys.as_ref().ok_or_else(|| {
+            fail("this operation needs the master password, not the recovery key")
+        })?;
+        Ok(login_registered(api, email, keys, &self.device)?)
+    }
+
+    fn register(&mut self, input: &mut SecretInput, server: &str, email: &str) -> Result<()> {
+        if self.store.remote()?.is_some() {
+            return Err(fail("this vault is already registered on a server"));
+        }
+        let email = lk_auth::normalize_email(email).map_err(|_| fail("invalid e-mail address"))?;
+        let password_keys = self
+            .password_keys
+            .as_ref()
+            .ok_or_else(|| fail("registration needs the master password"))?;
+        let recovery = RecoveryKey::parse(
+            &input.read("Recovery key (to register the recovery credential): ")?,
+        )?;
+        let certificate = self
+            .store
+            .device_certificate()?
+            .ok_or_else(|| fail("this device has no certificate"))?;
+        let api = Api::new(UreqTransport::new(server)?);
+        let bundle = self.store.account_bundle()?;
+        register_account(
+            &api,
+            &email,
+            password_keys,
+            &recovery,
+            &bundle,
+            &certificate,
+        )?;
+        self.store
+            .set_remote(&lk_sync::normalize_server_url(server)?, &email)?;
+        println!("Registered {email} on {server}.");
+        self.sync()?;
+        Ok(())
+    }
+
+    fn sync(&mut self) -> Result<SyncReport> {
+        let (api, email) = self.remote_required()?;
+        let session = self.full_session(&api, &email)?;
+        let mut total = SyncReport::default();
+        for wrapped in self.store.wrapped_vault_keys()? {
+            let vault = self.keys.open_vault_key(&wrapped)?;
+            let r = sync_vault(&api, &session, &mut self.store, &vault, &wrapped, now())?;
+            total.pulled = total.pulled.saturating_add(r.pulled);
+            total.pushed = total.pushed.saturating_add(r.pushed);
+            total.conflicts = total.conflicts.saturating_add(r.conflicts);
+            total.conflict_copies.extend(r.conflict_copies);
+        }
+        let _ = api.logout(&session);
+        println!(
+            "Synchronized: {} received, {} sent, {} conflict(s){}",
+            total.pulled,
+            total.pushed,
+            total.conflicts,
+            if total.conflict_copies.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    " — {} conflict copy(ies) created, nothing was lost",
+                    total.conflict_copies.len()
+                )
+            }
+        );
+        Ok(total)
+    }
+
+    fn devices(&self) -> Result<()> {
+        let (api, email) = self.remote_required()?;
+        let session = self.full_session(&api, &email)?;
+        let list = api.devices(&session)?;
+        let _ = api.logout(&session);
+        let certificates: Vec<_> = list.devices.iter().map(|d| d.certificate.clone()).collect();
+        let revocations: Vec<_> = list
+            .devices
+            .iter()
+            .filter_map(|d| d.revocation.clone())
+            .collect();
+        // Fail closed: one forged entry invalidates the whole list.
+        let trusted = lk_core::trusted_devices(
+            &self.keys.account_id(),
+            &self.keys.signing_public_key(),
+            &certificates,
+            &revocations,
+        )
+        .map_err(|_| fail("the device list returned by the server failed verification"))?;
+        for entry in &list.devices {
+            let d = &entry.certificate.device;
+            let status = if d.device_id == self.device.device_id() {
+                "this device"
+            } else if entry.revocation.is_some() {
+                "revoked"
+            } else if trusted.iter().any(|t| t.device_id == d.device_id) {
+                "active"
+            } else {
+                "untrusted"
+            };
+            println!(
+                "{}  {:<12} {:<20} {:?}, enrolled {}, last seen {}",
+                d.device_id.to_string().chars().take(8).collect::<String>(),
+                status,
+                d.name,
+                d.platform,
+                utc(d.created_at_unix),
+                entry.last_seen_unix.map_or_else(|| "never".to_owned(), utc)
+            );
+        }
+        Ok(())
+    }
+
+    fn revoke(&self, reference: &str) -> Result<()> {
+        let r = reference.trim().to_lowercase();
+        if r.chars().count() < 4 {
+            return Err(fail(
+                "a device reference needs at least 4 characters of its ID",
+            ));
+        }
+        let (api, email) = self.remote_required()?;
+        let session = self.full_session(&api, &email)?;
+        let list = api.devices(&session)?;
+        let matches: Vec<_> = list
+            .devices
+            .iter()
+            .filter(|d| d.certificate.device.device_id.to_string().starts_with(&r))
+            .collect();
+        let target = match matches.as_slice() {
+            [one] => one.certificate.device.device_id,
+            [] => return Err(fail(format!("no device matches {reference}"))),
+            _ => {
+                return Err(fail(format!(
+                    "several devices match {reference}; give more characters"
+                )));
+            }
+        };
+        if target == self.device.device_id() {
+            return Err(fail("this is the current device; it cannot revoke itself"));
+        }
+        let revocation = self.keys.revoke_device(target, now())?;
+        api.revoke(&session, &revocation)?;
+        let _ = api.logout(&session);
+        println!("Device {target} revoked. It can no longer reach the server.");
+        eprintln!(
+            "Note: data that device already decrypted cannot be erased remotely; \
+             key rotation after revocation arrives in a later version."
+        );
+        Ok(())
     }
 
     fn decrypted_items(&self) -> Result<Vec<(StoredItem, ItemData)>> {
@@ -820,13 +1116,31 @@ impl Session {
         Ok(())
     }
 
+    /// Changes (or, unlocked with the recovery key, resets) the master
+    /// password. When registered, the server credential is replaced first:
+    /// if that fails, nothing changes locally.
     fn passwd(&mut self, input: &mut SecretInput) -> Result<()> {
         let new = read_new_master_password(input)?;
         let bundle = self.store.account_bundle()?;
         eprintln!("Deriving keys (Argon2id)...");
-        let (updated, _auth) =
+        let (updated, new_auth) =
             self.keys
                 .change_password(&bundle, &new, KdfParams::recommended())?;
+        if let Some((api, email)) = self.remote()? {
+            let session = match &self.recovery_key {
+                Some(rk) => api.login(
+                    &email,
+                    &rk.server_auth_key().map_err(lk_core::CoreError::from)?,
+                    CredentialKind::Recovery,
+                    self.device.device_id(),
+                )?,
+                None => self.full_session(&api, &email)?,
+            };
+            api.replace_credential(&session, CredentialKind::Password, &new_auth, &updated)?;
+            if self.recovery_key.is_none() {
+                let _ = api.logout(&session);
+            }
+        }
         self.store.replace_account_bundle(&updated, now())?;
         println!("Master password changed. Your recovery key is unchanged.");
         Ok(())
@@ -834,7 +1148,12 @@ impl Session {
 
     fn rotate_recovery(&mut self) -> Result<()> {
         let bundle = self.store.account_bundle()?;
-        let (updated, recovery_key, _auth) = self.keys.rotate_recovery_key(&bundle)?;
+        let (updated, recovery_key, new_auth) = self.keys.rotate_recovery_key(&bundle)?;
+        if let Some((api, email)) = self.remote()? {
+            let session = self.full_session(&api, &email)?;
+            api.replace_credential(&session, CredentialKind::Recovery, &new_auth, &updated)?;
+            let _ = api.logout(&session);
+        }
         self.store.replace_account_bundle(&updated, now())?;
         println!("Recovery key replaced. The previous one no longer works.");
         print_recovery_key(&recovery_key)

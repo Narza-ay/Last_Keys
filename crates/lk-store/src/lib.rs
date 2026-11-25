@@ -30,10 +30,11 @@ use rusqlite::{Connection, OpenFlags, OptionalExtension, Transaction, params};
 use thiserror::Error;
 
 /// Database schema version written by this build.
-pub const SCHEMA_VERSION: i64 = 1;
+pub const SCHEMA_VERSION: i64 = 2;
 
 /// Forward-only migrations; entry `i` upgrades version `i` to `i + 1`.
-const MIGRATIONS: &[&str] = &[r"
+const MIGRATIONS: &[&str] = &[
+    r"
 CREATE TABLE account (
     id          INTEGER PRIMARY KEY CHECK (id = 1),
     account_id  TEXT    NOT NULL,
@@ -69,7 +70,21 @@ CREATE TABLE pending_changes (
     kind        TEXT    NOT NULL CHECK (kind IN ('upsert', 'delete')),
     created_at  INTEGER NOT NULL
 );
-"];
+",
+    r"
+-- v2: synchronization state (ADR-0008).
+ALTER TABLE items ADD COLUMN server_revision INTEGER NOT NULL DEFAULT 0 CHECK (server_revision >= 0);
+CREATE TABLE sync_state (
+    vault_id  TEXT    PRIMARY KEY,
+    cursor    INTEGER NOT NULL CHECK (cursor >= 0)
+);
+CREATE TABLE remote (
+    id          INTEGER PRIMARY KEY CHECK (id = 1),
+    server_url  TEXT NOT NULL,
+    email       TEXT NOT NULL
+);
+",
+];
 
 /// Errors returned by `lk-store`. Messages never contain vault data (only
 /// ciphertext ever reaches this layer).
@@ -542,6 +557,229 @@ impl Store {
             });
         }
         Ok(out)
+    }
+}
+
+/// Local view of an item, including deleted ones (for synchronization).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LocalItem {
+    /// Item identifier.
+    pub item_id: ItemId,
+    /// Vault identifier.
+    pub vault_id: VaultId,
+    /// Encrypted content; `None` when deleted.
+    pub item: Option<EncryptedItem>,
+    /// Last server revision this device knows (0 if never synchronized).
+    pub server_revision: u64,
+}
+
+/// An item state received from the server.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RemoteState {
+    /// Item identifier.
+    pub item_id: ItemId,
+    /// Server revision.
+    pub revision: u64,
+    /// Content; `None` for a tombstone.
+    pub item: Option<EncryptedItem>,
+}
+
+impl Store {
+    /// Server binding of this store (URL, account e-mail), if registered.
+    ///
+    /// # Errors
+    /// Database errors.
+    pub fn remote(&self) -> Result<Option<(String, String)>> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT server_url, email FROM remote WHERE id = 1",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .optional()?)
+    }
+
+    /// Records the server binding.
+    ///
+    /// # Errors
+    /// Database errors.
+    pub fn set_remote(&mut self, server_url: &str, email: &str) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO remote (id, server_url, email) VALUES (1, ?1, ?2)
+             ON CONFLICT (id) DO UPDATE SET server_url = excluded.server_url, email = excluded.email",
+            params![server_url, email],
+        )?;
+        Ok(())
+    }
+
+    /// Pull cursor of a vault (0 before the first pull).
+    ///
+    /// # Errors
+    /// Database errors.
+    pub fn sync_cursor(&self, vault_id: &VaultId) -> Result<u64> {
+        let cursor: Option<i64> = self
+            .conn
+            .query_row(
+                "SELECT cursor FROM sync_state WHERE vault_id = ?1",
+                params![vault_id.to_string()],
+                |r| r.get(0),
+            )
+            .optional()?;
+        cursor.map_or(Ok(0), to_u64)
+    }
+
+    /// Advances the pull cursor of a vault. A cursor never moves backwards.
+    ///
+    /// # Errors
+    /// [`StoreError::Corrupted`] if `cursor` is lower than the stored one.
+    pub fn set_sync_cursor(&mut self, vault_id: &VaultId, cursor: u64) -> Result<()> {
+        if cursor < self.sync_cursor(vault_id)? {
+            return Err(StoreError::Corrupted("sync cursor moved backwards"));
+        }
+        self.conn.execute(
+            "INSERT INTO sync_state (vault_id, cursor) VALUES (?1, ?2)
+             ON CONFLICT (vault_id) DO UPDATE SET cursor = excluded.cursor",
+            params![vault_id.to_string(), to_i64(cursor)?],
+        )?;
+        Ok(())
+    }
+
+    /// An item including tombstones.
+    ///
+    /// # Errors
+    /// Database errors or a corrupted record.
+    pub fn local_item(&self, item_id: &ItemId) -> Result<Option<LocalItem>> {
+        let row: Option<(String, String, Option<String>, i64)> = self
+            .conn
+            .query_row(
+                "SELECT item_id, vault_id, encrypted, server_revision FROM items WHERE item_id = ?1",
+                params![item_id.to_string()],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+            )
+            .optional()?;
+        let Some((id, vault, json, server_revision)) = row else {
+            return Ok(None);
+        };
+        let item: Option<EncryptedItem> = json.map(|j| serde_json::from_str(&j)).transpose()?;
+        if let Some(i) = &item
+            && (i.item_id.to_string() != id || i.vault_id.to_string() != vault)
+        {
+            return Err(StoreError::Corrupted("item index mismatch"));
+        }
+        Ok(Some(LocalItem {
+            item_id: parse_id(&id)?,
+            vault_id: parse_id(&vault)?,
+            item,
+            server_revision: to_u64(server_revision)?,
+        }))
+    }
+
+    /// Writes a state received from the server and, in the same
+    /// transaction, drops the local changes of that item queued up to
+    /// `resolved_up_to_seq` (they are superseded or already applied).
+    ///
+    /// Refuses a state older than the revision already known for the item
+    /// (rollback protection, ADR-0008).
+    ///
+    /// # Errors
+    /// [`StoreError::Corrupted`] on a rollback or mismatched identifiers;
+    /// database errors (e.g. unknown vault).
+    pub fn apply_remote(
+        &mut self,
+        vault_id: &VaultId,
+        state: &RemoteState,
+        resolved_up_to_seq: Option<u64>,
+        now_unix: u64,
+    ) -> Result<()> {
+        if let Some(item) = &state.item
+            && (item.item_id != state.item_id || item.vault_id != *vault_id)
+        {
+            return Err(StoreError::Mismatch("vault"));
+        }
+        let tx = self.conn.transaction()?;
+        let current: Option<(i64, i64, String)> = tx
+            .query_row(
+                "SELECT revision, server_revision, vault_id FROM items WHERE item_id = ?1",
+                params![state.item_id.to_string()],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .optional()?;
+        if let Some((_, known, vault)) = &current {
+            if *vault != vault_id.to_string() {
+                return Err(StoreError::Mismatch("vault"));
+            }
+            if to_u64(*known)? > state.revision {
+                return Err(StoreError::Corrupted("server returned an older revision"));
+            }
+        }
+        let local_revision = current
+            .as_ref()
+            .map_or(0, |(r, _, _)| *r)
+            .checked_add(1)
+            .ok_or(StoreError::Corrupted("revision overflow"))?;
+        let json = state.item.as_ref().map(serde_json::to_string).transpose()?;
+        tx.execute(
+            "INSERT INTO items (item_id, vault_id, revision, deleted, encrypted, updated_at, server_revision)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+             ON CONFLICT (item_id) DO UPDATE SET
+                revision = excluded.revision, deleted = excluded.deleted, encrypted = excluded.encrypted,
+                updated_at = excluded.updated_at, server_revision = excluded.server_revision",
+            params![
+                state.item_id.to_string(),
+                vault_id.to_string(),
+                local_revision,
+                state.item.is_none(),
+                json,
+                to_i64(now_unix)?,
+                to_i64(state.revision)?
+            ],
+        )?;
+        if let Some(seq) = resolved_up_to_seq {
+            tx.execute(
+                "DELETE FROM pending_changes WHERE item_id = ?1 AND seq <= ?2",
+                params![state.item_id.to_string(), to_i64(seq)?],
+            )?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Records that the local changes of an item up to `up_to_seq` were
+    /// accepted by the server at `server_revision`.
+    ///
+    /// # Errors
+    /// Database errors.
+    pub fn mark_pushed(
+        &mut self,
+        item_id: &ItemId,
+        server_revision: u64,
+        up_to_seq: u64,
+    ) -> Result<()> {
+        let tx = self.conn.transaction()?;
+        tx.execute(
+            "UPDATE items SET server_revision = ?2 WHERE item_id = ?1",
+            params![item_id.to_string(), to_i64(server_revision)?],
+        )?;
+        tx.execute(
+            "DELETE FROM pending_changes WHERE item_id = ?1 AND seq <= ?2",
+            params![item_id.to_string(), to_i64(up_to_seq)?],
+        )?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Forgets the known server revision of an item (the server no longer
+    /// knows it), so that the next push re-creates it.
+    ///
+    /// # Errors
+    /// Database errors.
+    pub fn reset_server_revision(&mut self, item_id: &ItemId) -> Result<()> {
+        self.conn.execute(
+            "UPDATE items SET server_revision = 0 WHERE item_id = ?1",
+            params![item_id.to_string()],
+        )?;
+        Ok(())
     }
 }
 

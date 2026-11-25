@@ -28,6 +28,15 @@ pub(crate) fn fail(message: impl Into<String>) -> CliError {
     CliError::Message(message.into())
 }
 
+impl From<lk_sync::SyncError> for CliError {
+    fn from(e: lk_sync::SyncError) -> Self {
+        match e {
+            lk_sync::SyncError::InvalidCredentials => Self::Credentials,
+            other => Self::Other(Box::new(other)),
+        }
+    }
+}
+
 impl From<CoreError> for CliError {
     fn from(e: CoreError) -> Self {
         match e {

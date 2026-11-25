@@ -42,6 +42,12 @@ allow = [
   "BSD-3-Clause",
   "Unicode-3.0",
   "Zlib",
+  # ring, rustls-webpki, untrusted (TLS stack of the native HTTP client);
+  # permissive, MIT-equivalent. Reviewed 2026-11-25.
+  "ISC",
+  # webpki-root-certs (Mozilla root store data, fallback of the platform
+  # verifier); permissive data licence. Reviewed 2026-11-25.
+  "CDLA-Permissive-2.0",
 ]
 confidence-threshold = 0.93
 

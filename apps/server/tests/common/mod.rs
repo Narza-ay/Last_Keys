@@ -332,3 +332,22 @@ pub async fn push(
         )
         .await
 }
+
+impl TestServer {
+    /// Serves the same router over real TCP on 127.0.0.1 (random port), for
+    /// clients using the real HTTP transport. Returns the base URL.
+    pub async fn serve_http(&self) -> String {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let router = self.router.clone();
+        tokio::spawn(async move {
+            axum::serve(
+                listener,
+                router.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+            )
+            .await
+            .unwrap();
+        });
+        format!("http://{addr}")
+    }
+}

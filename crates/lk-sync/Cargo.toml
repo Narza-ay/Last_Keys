@@ -1,0 +1,30 @@
+[package]
+name = "lk-sync"
+description = "Last Keys client synchronization: API client, HTTP transport, sync engine with conflict copies."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+default = ["http"]
+# Native HTTP transport (rustls + OS trust store). Disabled for targets that
+# bring their own transport (e.g. browsers).
+http = ["dep:ureq"]
+
+[dependencies]
+lk-auth.workspace = true
+lk-core.workspace = true
+lk-crypto.workspace = true
+lk-protocol.workspace = true
+lk-store.workspace = true
+lk-vault.workspace = true
+serde.workspace = true
+serde_json = { workspace = true, features = ["std"] }
+thiserror.workspace = true
+url.workspace = true
+ureq = { workspace = true, optional = true }
+
+[lints]
+workspace = true

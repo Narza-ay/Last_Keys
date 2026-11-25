@@ -9,6 +9,7 @@ members = [
   "crates/lk-store",
   "crates/lk-auth",
   "crates/lk-protocol",
+  "crates/lk-sync",
   "apps/cli",
   "apps/server",
 ]
@@ -36,6 +37,7 @@ lk-vault = { path = "crates/lk-vault" }
 lk-store = { path = "crates/lk-store" }
 lk-auth = { path = "crates/lk-auth" }
 lk-protocol = { path = "crates/lk-protocol" }
+lk-sync = { path = "crates/lk-sync" }
 
 # Cryptography (RustCrypto / dalek / rust-hpke). No custom primitives.
 argon2 = { version = "0.6.0", default-features = false, features = ["alloc", "zeroize"] }
@@ -82,6 +84,9 @@ tower-http = { version = "0.7.1", features = ["trace", "timeout"] }
 sqlx = { version = "0.9.1", default-features = false, features = ["runtime-tokio", "postgres", "migrate", "macros", "uuid", "json"] }
 tracing = { version = "0.1.44" }
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "fmt", "json"] }
+
+# HTTP client of native apps: rustls with the operating system's trust store.
+ureq = { version = "3.5.2", default-features = false, features = ["rustls", "platform-verifier", "json"] }
 
 # Command-line client only
 clap = { version = "4.6.10", features = ["derive"] }

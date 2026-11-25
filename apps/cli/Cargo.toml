@@ -18,11 +18,28 @@ lk-generator.workspace = true
 lk-store.workspace = true
 lk-totp.workspace = true
 lk-vault.workspace = true
+lk-auth.workspace = true
+lk-protocol.workspace = true
+lk-sync.workspace = true
 clap.workspace = true
 rpassword.workspace = true
 
+[features]
+# End-to-end tests against a real server and PostgreSQL
+# (needs LK_TEST_DATABASE_URL; run in the CI `server-tests` job).
+server-e2e = []
+
+[[test]]
+name = "sync_e2e"
+required-features = ["server-e2e"]
+
 [dev-dependencies]
 tempfile.workspace = true
+lk-server = { path = "../server" }
+tokio.workspace = true
+sqlx.workspace = true
+axum.workspace = true
+data-encoding.workspace = true
 
 [lints]
 workspace = true
