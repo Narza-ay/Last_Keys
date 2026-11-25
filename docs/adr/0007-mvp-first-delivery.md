@@ -1,6 +1,6 @@
 # ADR-0007: MVP-first delivery order
 
-* Status: **Proposed** — awaiting owner confirmation of the MVP scope (AUDIT decision 10)
+* Status: Accepted (MVP scope confirmed by the owner on 2026-11-25)
 * Date: 2026-11-25
 
 ## Context

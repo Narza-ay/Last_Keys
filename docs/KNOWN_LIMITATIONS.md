@@ -15,7 +15,9 @@ the security model.
 | HPKE is tested for round-trip, tampering and binding, not yet against a second independent implementation. | M2 (criterion V-C3) |
 | Device-identity and private-key storage use a caller-supplied wrapping key; platform key-store adapters (hardware protection) do not exist yet. | Phase 5 / M7 |
 | Pairing verification between a new device and a trusted device (out-of-band code) is not designed yet. | Phase 5 / M7 |
-| Windows and macOS: the Rust core is tested by the CI matrix only; no local verification. | CI runs on each push |
+| Windows and macOS: the Rust core is tested by the CI matrix (GitHub-hosted runners) only, not on physical user machines. | Platform testing with the desktop app (M4) |
+| Strength estimation exists only for generated secrets (exact entropy); passwords chosen by users are not yet scored. | Onboarding screen (M4), security center (Phase 7) |
+| Passphrases use the English EFF wordlist only. | French wordlist with a compatible license (before v0.1) |
 | GitHub Actions in CI are pinned to major version tags, not commit SHAs. | Pin to SHAs when the release pipeline is set up (Phase 8) |
 
 ## Platform and design

@@ -49,7 +49,7 @@ cargo run --release -p lk-crypto --example kdf_bench
 | `cargo deny check` | advisories ok, bans ok, licenses ok, sources ok (one warning: duplicate `syn` versions, build-time only) |
 | `cargo doc -D warnings` | pass |
 | Fuzzing, 60 s per target | no crash: `envelope_parse` 6.28 M runs, `sealed_parse` 5.98 M, `recovery_parse` 2.49 M, `bundle_json` 1.28 M |
-| Windows, macOS | run by CI on push (see the CI run of the commit) |
+| Windows, macOS | CI run 45630834635 (commit `dc25306`): all 7 jobs green; 90/90 tests pass on `windows-latest` and `macos-latest` (dev and release) |
 
 ## KDF benchmark campaign (criterion V-C8)
 

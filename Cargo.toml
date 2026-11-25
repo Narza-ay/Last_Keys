@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/lk-crypto", "crates/lk-core"]
+members = ["crates/lk-crypto", "crates/lk-core", "crates/lk-generator"]
 # Fuzz targets need a nightly toolchain and live in their own workspace.
 exclude = ["fuzz"]
 
@@ -19,6 +19,7 @@ publish = false
 [workspace.dependencies]
 lk-crypto = { path = "crates/lk-crypto" }
 lk-core = { path = "crates/lk-core" }
+lk-generator = { path = "crates/lk-generator" }
 
 # Cryptography (RustCrypto / dalek / rust-hpke). No custom primitives.
 argon2 = { version = "0.6.0", default-features = false, features = ["alloc", "zeroize"] }

@@ -101,7 +101,7 @@ listed first.
 | 7 | Android passkey provider scope (P-1) | Accept Android 14+ for system passkeys | Phase 5 |
 | 8 | Free-tier quotas (D-1) | Define before the official cloud opens | Phase 3 (cloud) |
 | 9 | NordPass sample export (D-2) | Owner provides a fake-data export | M6 |
-| 10 | MVP scope ([ROADMAP.md](../ROADMAP.md)) | As proposed: CLI → server/sync → desktop → extension → NordPass import | — |
+| 10 | MVP scope ([ROADMAP.md](../ROADMAP.md)) | **Resolved 2026-11-25**: confirmed as proposed (CLI → server/sync → desktop → extension → NordPass import) | — |
 
 ---
 

@@ -1,0 +1,11 @@
+Last Keys — third-party notices
+
+This product includes the following third-party material in addition to the
+Rust crates listed in Cargo.lock (each under its own license, see deny.toml):
+
+EFF Large Wordlist for Passphrases
+  File: crates/lk-generator/data/eff_large_wordlist.txt (words column only)
+  Source: https://www.eff.org/files/2016/07/18/eff_large_wordlist.txt
+  Copyright: Electronic Frontier Foundation
+  License: Creative Commons Attribution 3.0 United States (CC BY 3.0 US)
+           https://creativecommons.org/licenses/by/3.0/us/

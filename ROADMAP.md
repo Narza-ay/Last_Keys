@@ -8,7 +8,7 @@ the phases. Nothing is skipped — every phase keeps its validation gate
 ([AUDIT.md §3](docs/AUDIT.md#3-technical-validation-criteria)); only the
 delivery order changes.
 
-## MVP definition (v0.1, proposed — awaiting owner confirmation)
+## MVP definition (v0.1, confirmed by the owner on 2026-11-25)
 
 A single user can create an account, keep an end-to-end encrypted vault of
 logins, secure notes and TOTP codes, generate passwords, import from NordPass,
@@ -27,7 +27,7 @@ monitoring, P2P sync, documents/attachments, web application, telemetry.
 |---|-----------|-------------|--------|
 | M0 | Audit, architecture, documentation, monorepo, CI | 1 | ✅ Done |
 | M1 | Cryptographic core: KDF, envelopes, HPKE, signatures, recovery key, key hierarchy, device identities, certificates, revocation, trusted-device transfer | 2 | ✅ Done |
-| M2 | Vault model (logins, notes, cards, identities, TOTP), password/passphrase generator, local encrypted store (SQLite) with offline queue, `lk` CLI for end-to-end verification, HPKE cross-implementation vector, KDF benchmark campaign | 2, 4 | 🔜 Next |
+| M2 | Vault model (logins, notes, cards, identities, TOTP), password/passphrase generator, local encrypted store (SQLite) with offline queue, `lk` CLI for end-to-end verification, HPKE cross-implementation vector, KDF benchmark campaign | 2, 4 | 🚧 In progress |
 | M3 | Server: OPAQUE authentication, device registry, encrypted sync with change log and conflict handling, revocation enforcement, PostgreSQL, Docker Compose self-hosting, backup/restore | 3 | ⬜ |
 | M4 | Desktop app (Tauri 2): unlock, vault browsing/editing, generator, TOTP, devices, settings, FR/EN, light/dark/system | 6 | ⬜ |
 | M5 | Browser extension (Chrome, Brave, Firefox): login-form detection, safe domain matching, fill, save, generate | 6 | ⬜ |
@@ -56,6 +56,5 @@ Remaining risks: OPAQUE integration not yet prototyped; KDF defaults not yet
 measured on mobile/WASM; pairing verification protocol not yet designed;
 platform claims marked **[verify]** in the audit are unconfirmed.
 
-### Next (M2) — entry criteria
-Owner confirmation of the MVP scope (AUDIT §2, item 10). No other decision
-blocks M2.
+CI run 1 (commit `dc25306`): all 7 jobs green, including the 90 tests on
+Windows and macOS. MVP scope confirmed by the owner; M2 started.
