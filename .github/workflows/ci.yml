@@ -56,7 +56,7 @@ jobs:
           rustup toolchain install
           rustup target add wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
-      - run: cargo check -p lk-core -p lk-crypto --target wasm32-unknown-unknown --locked
+      - run: cargo check -p lk-core -p lk-crypto -p lk-generator -p lk-totp --target wasm32-unknown-unknown --locked
 
   deny:
     name: Dependency policy (cargo-deny)

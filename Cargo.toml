@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/lk-crypto", "crates/lk-core", "crates/lk-generator"]
+members = ["crates/lk-crypto", "crates/lk-core", "crates/lk-generator", "crates/lk-totp"]
 # Fuzz targets need a nightly toolchain and live in their own workspace.
 exclude = ["fuzz"]
 
@@ -20,12 +20,17 @@ publish = false
 lk-crypto = { path = "crates/lk-crypto" }
 lk-core = { path = "crates/lk-core" }
 lk-generator = { path = "crates/lk-generator" }
+lk-totp = { path = "crates/lk-totp" }
 
 # Cryptography (RustCrypto / dalek / rust-hpke). No custom primitives.
 argon2 = { version = "0.6.0", default-features = false, features = ["alloc", "zeroize"] }
 chacha20poly1305 = { version = "0.11.0", default-features = false, features = ["alloc", "zeroize"] }
 hkdf = { version = "0.13.0", default-features = false }
 sha2 = { version = "0.11.1", default-features = false }
+# HOTP/TOTP only (RFC 4226/6238 mandate HMAC-SHA1 compatibility); never used
+# for anything else.
+sha1 = { version = "0.11.0", default-features = false }
+hmac = { version = "0.13.0", default-features = false }
 ed25519-dalek = { version = "3.0.0", default-features = false, features = ["fast", "zeroize", "alloc"] }
 hpke = { version = "0.15.1", default-features = false, features = ["alloc", "x25519", "chacha", "getrandom"] }
 getrandom = { version = "0.4.3", default-features = false }
@@ -35,6 +40,8 @@ subtle = { version = "2.6.1", default-features = false }
 # Encoding / text
 data-encoding = { version = "2.11.1", default-features = false, features = ["alloc"] }
 unicode-normalization = { version = "0.1.26", default-features = false }
+url = { version = "2.5.9" }
+percent-encoding = { version = "2.3.2" }
 
 # General
 thiserror = { version = "2.0.21", default-features = false }
