@@ -251,6 +251,17 @@ impl Vault {
         })
     }
 
+    /// Checks the master password again (before a sensitive operation in an
+    /// already unlocked session).
+    ///
+    /// # Errors
+    /// [`ClientError::InvalidCredentials`] if it is wrong.
+    pub fn verify_master_password(&self, password: &MasterPassword) -> Result<()> {
+        let bundle = self.store.account_bundle()?;
+        bundle.unlock_with_password(password)?;
+        Ok(())
+    }
+
     /// Path of the vault file.
     #[must_use]
     pub fn path(&self) -> &Path {

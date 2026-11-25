@@ -12,9 +12,14 @@ vulnerability monitoring, and a proprietary license compatible with them.
   versions; exact resolution is pinned by the committed `Cargo.lock`; CI builds
   with `--locked`.
 * `cargo deny check` (advisories, licenses, bans, sources) runs in CI. Only
-  permissive licenses are accepted (currently MIT, Apache-2.0, BSD-3-Clause,
-  Unicode-3.0, Zlib); copyleft licenses are refused because the product is
-  proprietary and statically linked. Only crates.io is allowed as a source.
+  permissive licenses are accepted (MIT, Apache-2.0, BSD-3-Clause,
+  Unicode-3.0, Zlib, ISC, BSL-1.0, CDLA-Permissive-2.0, Apache-2.0 WITH
+  LLVM-exception), plus MPL-2.0 for unmodified crates that the desktop shell
+  cannot avoid (amended 2026-11-25, M4): MPL-2.0 is a file-level copyleft
+  that explicitly allows proprietary larger works; the crates are listed in
+  `NOTICE` with the location of their source, and modifying one requires
+  review. Strong copyleft (GPL, LGPL, AGPL) is refused because the product
+  is proprietary and links statically. Only crates.io is allowed as a source.
 * Dependabot proposes updates weekly; updates are reviewed, never auto-merged.
 * Before adding a dependency: check maintenance (recent releases, active
   repository), security history (RustSec), platform support (including

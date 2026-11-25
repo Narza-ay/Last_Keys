@@ -34,8 +34,9 @@ ignore = [
 [licenses]
 version = 2
 # Last Keys is proprietary and statically links its dependencies:
-# only permissive licenses are accepted. No copyleft (GPL/LGPL/AGPL/MPL).
-# Kept to the licenses actually present; adding one requires review.
+# permissive licenses only, plus MPL-2.0 under the conditions below.
+# Strong copyleft (GPL/LGPL/AGPL) is refused. Kept to the licenses actually
+# present; adding one requires review (ADR-0003).
 allow = [
   "MIT",
   "Apache-2.0",
@@ -48,6 +49,17 @@ allow = [
   # webpki-root-certs (Mozilla root store data, fallback of the platform
   # verifier); permissive data licence. Reviewed 2026-11-25.
   "CDLA-Permissive-2.0",
+  # clipboard-win, error-code (desktop clipboard on Windows); permissive.
+  # Reviewed 2026-11-25.
+  "BSL-1.0",
+  # target-lexicon (build time, desktop); permissive. Reviewed 2026-11-25.
+  "Apache-2.0 WITH LLVM-exception",
+  # option-ext, cssparser, cssparser-macros, selectors, dtoa-short (pulled
+  # by Tauri/wry, no alternative). File-level weak copyleft: allowed in a
+  # proprietary larger work (MPL-2.0 §3.3) as long as these files are used
+  # unmodified and recipients are told where their source is (NOTICE).
+  # Modifying an MPL-2.0 file is not allowed without review. 2026-11-25.
+  "MPL-2.0",
 ]
 confidence-threshold = 0.93
 

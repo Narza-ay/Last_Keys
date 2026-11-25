@@ -13,6 +13,7 @@ members = [
   "crates/lk-client",
   "apps/cli",
   "apps/server",
+  "apps/desktop/src-tauri",
 ]
 # Fuzz targets need a nightly toolchain and live in their own workspace.
 exclude = ["fuzz"]
@@ -77,6 +78,11 @@ uuid = { version = "1.29.3", default-features = false, features = ["serde"] }
 # Local storage: SQLite compiled from the bundled amalgamation (same version
 # on every platform, no dependency on the system library).
 rusqlite = { version = "0.43.0", default-features = false, features = ["bundled"] }
+
+# Desktop only (ADR-0010)
+tauri = { version = "=2.12.5" }
+tauri-build = { version = "=2.7.4" }
+arboard = { version = "3.7.0", default-features = false }
 
 # Server only (ADR-0009)
 tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "net", "signal", "time"] }

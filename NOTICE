@@ -9,3 +9,13 @@ EFF Large Wordlist for Passphrases
   Copyright: Electronic Frontier Foundation
   License: Creative Commons Attribution 3.0 United States (CC BY 3.0 US)
            https://creativecommons.org/licenses/by/3.0/us/
+
+Mozilla Public License 2.0 components (desktop application)
+  The desktop application links the following crates, used unmodified.
+  Their source code is available from crates.io at the versions recorded in
+  Cargo.lock, and is covered by the MPL-2.0 (https://mozilla.org/MPL/2.0/):
+    option-ext        https://crates.io/crates/option-ext
+    cssparser         https://crates.io/crates/cssparser
+    cssparser-macros  https://crates.io/crates/cssparser-macros
+    selectors         https://crates.io/crates/selectors
+    dtoa-short        https://crates.io/crates/dtoa-short
