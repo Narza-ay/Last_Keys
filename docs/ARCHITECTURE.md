@@ -70,7 +70,8 @@ docs/                 specification, architecture, security, ADRs, audit
 | `lk-generator` | M2 | Passwords, passphrases, exact entropy of generated secrets | ✅ |
 | `lk-totp` | M2 | HOTP/TOTP (RFC 4226/6238), `otpauth://` parsing and generation, clock-skew check | ✅ |
 | `lk-store` | M2 | Local encrypted store (SQLite), migrations, tombstones, offline change queue | ✅ |
-| `lk-protocol` | M3 | Versioned API data types shared by server and clients | 📐 |
+| `lk-auth` | M3 | OPAQUE registration/login (RFC 9807), session tokens | ✅ |
+| `lk-protocol` | M3 | Versioned API data types shared by server and clients | ✅ |
 | `lk-sync` | M3 | Change log, conflict detection, merge, sync state machine | 📐 |
 | `lk-import` | M6 | NordPass (then Bitwarden, 1Password, CSV) | 📐 |
 | `lk-wasm` | M4/M5 | `wasm-bindgen` bindings for web app and extension | 📐 |
@@ -79,7 +80,7 @@ docs/                 specification, architecture, security, ADRs, audit
 | Application | Milestone | Stack | Status |
 |-------------|-----------|-------|--------|
 | `apps/cli` | M2 | Rust (`lk` command) for end-to-end verification and power users | ✅ (local) |
-| `apps/server` | M3 | Rust, PostgreSQL, REST + WebSocket, Docker | 📐 |
+| `apps/server` | M3 | Rust (axum), PostgreSQL, REST (WebSocket later), Docker | 🚧 endpoints done; packaging next |
 | `apps/desktop` | M4 | Tauri 2 + TypeScript | 📐 |
 | `apps/extension` | M5 | TypeScript, MV3, `lk-wasm` | 📐 |
 | `apps/web` | Phase 6 | React + TypeScript + `lk-wasm` | 📐 |

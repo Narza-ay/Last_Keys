@@ -37,10 +37,13 @@ cargo run --release -p lk-crypto --example kdf_bench
 | `lk-totp` | vectors (13), properties (3) | 16 | **RFC 4226 and RFC 6238 vectors** (SHA1/256/512, recomputed with Python `hmac`); otpauth parsing, round trip, reserved characters, rejections; clock skew; parsers never panic (1024 cases each) |
 | `lk-vault` | unit (11), codec (7), properties (3) | 21 | URL/TOTP normalization, Luhn, field validation, bounded password history with restore/delete, search excludes secrets, fully redacted `Debug`; encrypted round trips; newer schema reported, unknown fields rejected, decoded items validated, size limits; decoder never panics |
 | `lk-store` | store (11) | 11 | Create/open/refuse overwrite, reopen + unlock + decrypt, revisions/tombstones/change queue, rollback on failure, vault and account mismatch, password-change persistence, newer schema refused, tampered rows detected, owner-only files, **V-S1 canary test (no plaintext in database or WAL)** |
+| `lk-auth` | unit (2), opaque (8), properties (1) | 11 | OPAQUE: same session token on both sides, wrong key, unknown account indistinguishable (equal response length), identifier binding, tampering, serialization, foreign server secret, malformed input; server decoders never panic |
+| `lk-protocol` | unit (2) | 2 | Wire format of error codes and push outcomes |
+| `lk-server` | unit (1), auth (12), devices (5), sync (9) | 27 | **Against a real PostgreSQL** with a client built from the real crates: registration, login, enrollment, fake pre-login, wrong/unknown credentials, duplicate e-mail, closed registration, hostile bundles and certificates, single-use expiring attempts, recovery sessions, logout, rate limits; device enrollment, foreign certificates, revocation (immediate, permanent), forged revocations, immutable device keys; push/pull, decryption on another device, idempotent replays, conflicts, tombstones, misplaced/malformed items, account isolation, pagination, large items, password change and recovery reset, bundle identity; **V-Y1** (no plaintext or password in the database) |
 | `lk-cli` | unit (1), end to end (6) | 7 | Real binary: full workflow (add/list/search/show/reveal/TOTP/edit/history/restore/delete/info), wrong password, recovery-key password reset and rotation, init guards, secrets refused as arguments, generator, item references |
 | Fuzz | `fuzz/fuzz_targets/` | 5 targets | Parsers never panic; accepted envelopes and sealed messages are canonical; recovery keys and items re-encode identically |
 
-**Total: 162 tests.**
+**Total: 202 tests** (server tests require `LK_TEST_DATABASE_URL`, e.g. `postgres://lastkeys:lastkeys-dev@127.0.0.1/postgres` with `CREATEDB` rights; in CI they run in the `server-tests` job).
 
 ## Results — 2026-11-25 (Linux x86_64, toolchain 1.97.0)
 

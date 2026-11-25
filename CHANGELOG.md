@@ -6,6 +6,20 @@ semantic versioning once releases begin.
 
 ## [Unreleased]
 
+### Added — M3 (in progress, 2026-11-25)
+- ADR-0005 accepted (OPAQUE), ADR-0008 (sync protocol), ADR-0009 (server
+  stack); AUDIT decisions 3 and 5 resolved.
+- `lk-auth`: OPAQUE registration and login (opaque-ke 4.0.1), session tokens
+  derived from the OPAQUE session key and stored hashed.
+- `lk-protocol`: API v1 types.
+- `lk-server`: pre-login, registration, login, sessions (full, enrollment,
+  recovery), credential replacement, devices and revocation, vault keys,
+  push/pull synchronization, rate limits, migrations; `generate-secret`,
+  `migrate`, `serve` commands.
+- Security: RUSTSEC-2026-0387 exception justified by proof that the affected
+  code is not linked, enforced by the `advisory-guard` CI job.
+- CI: server integration tests with a PostgreSQL 16 service.
+
 ### Added — M2: local vault (2026-11-25)
 - `lk-generator`: password generator (classes, minimums, exclusions,
   uniform draws, Fisher–Yates shuffle) and EFF-wordlist passphrases, with
