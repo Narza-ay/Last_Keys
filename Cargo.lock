@@ -521,6 +521,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "lk-vault"
+version = "0.1.0"
+dependencies = [
+ "lk-core",
+ "lk-crypto",
+ "lk-totp",
+ "proptest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "url",
+]
+
+[[package]]
 name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -1,0 +1,23 @@
+[package]
+name = "lk-vault"
+description = "Last Keys vault model: versioned item schema, validation, password history, item encryption."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+lk-crypto.workspace = true
+lk-core.workspace = true
+lk-totp.workspace = true
+serde.workspace = true
+serde_json = { workspace = true, features = ["std"] }
+url.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true
