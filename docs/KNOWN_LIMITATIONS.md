@@ -1,0 +1,36 @@
+# Known limitations
+
+Maintained continuously (spec §19). Each entry links to its analysis in
+[AUDIT.md](AUDIT.md). "Current" limitations exist in the code today;
+"platform/design" limitations are permanent consequences of a platform or of
+the security model.
+
+## Current (M1)
+
+| Limitation | Planned resolution |
+|------------|--------------------|
+| No application, server, storage or UI yet: the product cannot be used by end users. Only the cryptographic core exists. | M2–M6 (MVP) |
+| Argon2id default parameters measured only on a server vCPU (≈ 147 ms); not yet on mobile or in WebAssembly. | KDF campaign, M2 (criterion V-C8) |
+| WebAssembly build is compile-checked in CI but not executed in a browser. | M4/M5 (`lk-wasm` + browser tests) |
+| HPKE is tested for round-trip, tampering and binding, not yet against a second independent implementation. | M2 (criterion V-C3) |
+| Device-identity and private-key storage use a caller-supplied wrapping key; platform key-store adapters (hardware protection) do not exist yet. | Phase 5 / M7 |
+| Pairing verification between a new device and a trusted device (out-of-band code) is not designed yet. | Phase 5 / M7 |
+| Windows and macOS: the Rust core is tested by the CI matrix only; no local verification. | CI runs on each push |
+| GitHub Actions in CI are pinned to major version tags, not commit SHAs. | Pin to SHAs when the release pipeline is set up (Phase 8) |
+
+## Platform and design
+
+* Data already decrypted by a revoked device or a share recipient cannot be erased remotely (AUDIT K-4).
+* Losing the master password, the recovery key and every trusted device makes the vault unrecoverable, by design (K-5).
+* An offline device keeps working with the state it last synchronized, including an old password, until it reconnects (K-6).
+* Android 10–13: no system-wide third-party passkey provider (API 34+ required) (P-1).
+* Windows: native passkey provider only on recent Windows 11 builds; elsewhere via the browser extension (P-2).
+* Linux: no system autofill or passkey provider, no standard hardware-backed key store; local protection is software (OS keyring) (P-3).
+* macOS/iOS system AutoFill requires a native Swift extension and an Apple Developer account (P-4).
+* Passkey login to a self-hosted server requires a domain name and a valid TLS certificate (P-6).
+* The web application trusts the server that delivers its code (P-7).
+* Browser extension: automatic form detection needs optional broad host access; without it, click-to-fill only (P-9).
+* Peer-to-peer sync works while apps are active; a relay is needed across NATs (P-10).
+* Browser extension can only lock on idle/locked state, not on every system sleep (P-11).
+* Breach detection only knows publicly known breaches (SEC-2).
+* Memory zeroization is best effort, and impossible to guarantee in garbage-collected UI layers (Kotlin, Swift, JavaScript).

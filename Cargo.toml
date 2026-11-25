@@ -1,0 +1,78 @@
+[workspace]
+resolver = "3"
+members = ["crates/lk-crypto", "crates/lk-core"]
+# Fuzz targets need a nightly toolchain and live in their own workspace.
+exclude = ["fuzz"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+# Kept equal to the pinned toolchain (rust-toolchain.toml): it is the only
+# compiler version this workspace is tested with.
+rust-version = "1.97"
+license = "LicenseRef-LastKeys-Proprietary"
+publish = false
+
+# Every dependency is declared once, here, with an explicit version.
+# Exact resolution is pinned by the committed Cargo.lock and CI builds with
+# `--locked`. See docs/adr/0003-dependency-policy.md before adding anything.
+[workspace.dependencies]
+lk-crypto = { path = "crates/lk-crypto" }
+lk-core = { path = "crates/lk-core" }
+
+# Cryptography (RustCrypto / dalek / rust-hpke). No custom primitives.
+argon2 = { version = "0.6.0", default-features = false, features = ["alloc", "zeroize"] }
+chacha20poly1305 = { version = "0.11.0", default-features = false, features = ["alloc", "zeroize"] }
+hkdf = { version = "0.13.0", default-features = false }
+sha2 = { version = "0.11.1", default-features = false }
+ed25519-dalek = { version = "3.0.0", default-features = false, features = ["fast", "zeroize", "alloc"] }
+hpke = { version = "0.15.1", default-features = false, features = ["alloc", "x25519", "chacha", "getrandom"] }
+getrandom = { version = "0.4.3", default-features = false }
+zeroize = { version = "1.9.2", default-features = false, features = ["alloc", "derive"] }
+subtle = { version = "2.6.1", default-features = false }
+
+# Encoding / text
+data-encoding = { version = "2.11.1", default-features = false, features = ["alloc"] }
+unicode-normalization = { version = "0.1.26", default-features = false }
+
+# General
+thiserror = { version = "2.0.21", default-features = false }
+serde = { version = "1.0.229", default-features = false, features = ["derive", "alloc"] }
+serde_json = { version = "1.0.154", default-features = false, features = ["alloc"] }
+uuid = { version = "1.29.3", default-features = false, features = ["serde"] }
+
+# Test-only
+proptest = { version = "1.12.0", default-features = false, features = ["std"] }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+unreachable_pub = "warn"
+unused_must_use = "deny"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+dbg_macro = "deny"
+print_stdout = "deny"
+print_stderr = "deny"
+mem_forget = "deny"
+indexing_slicing = "warn"
+arithmetic_side_effects = "warn"
+cast_possible_truncation = "warn"
+
+# Optimize dependencies (Argon2, ChaCha20, curve arithmetic) in dev and test
+# builds: debug-mode Argon2id with production parameters takes tens of seconds.
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+# Security-relevant: abort instead of unwinding so a panic can never leave
+# partially-initialised secret state reachable by a caller's catch_unwind.
+panic = "abort"
+lto = "thin"
+codegen-units = 1

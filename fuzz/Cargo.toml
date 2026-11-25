@@ -1,0 +1,48 @@
+# Coverage-guided fuzz targets (libFuzzer). Requires nightly:
+#   cargo +nightly fuzz run envelope_parse
+# Not part of the main workspace and never shipped.
+[package]
+name = "lk-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4.13"
+lk-crypto = { path = "../crates/lk-crypto" }
+lk-core = { path = "../crates/lk-core" }
+serde_json = "1.0.154"
+
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "envelope_parse"
+path = "fuzz_targets/envelope_parse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "sealed_parse"
+path = "fuzz_targets/sealed_parse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "recovery_parse"
+path = "fuzz_targets/recovery_parse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "bundle_json"
+path = "fuzz_targets/bundle_json.rs"
+test = false
+doc = false
+bench = false

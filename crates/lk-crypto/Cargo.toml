@@ -1,0 +1,33 @@
+[package]
+name = "lk-crypto"
+description = "Last Keys cryptographic primitives: KDF, authenticated envelopes, signatures, HPKE sealing and recovery keys."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+argon2.workspace = true
+chacha20poly1305.workspace = true
+hkdf.workspace = true
+sha2.workspace = true
+ed25519-dalek.workspace = true
+hpke.workspace = true
+getrandom.workspace = true
+zeroize.workspace = true
+subtle.workspace = true
+data-encoding.workspace = true
+unicode-normalization.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true
+
+# Browsers (web application, browser extensions): the OS CSPRNG is
+# `crypto.getRandomValues`, reached through getrandom's `wasm_js` backend.
+[target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
+getrandom = { workspace = true, features = ["wasm_js"] }

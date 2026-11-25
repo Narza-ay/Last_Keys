@@ -1,0 +1,6 @@
+# Pinned toolchain: every developer and every CI job builds with exactly this
+# compiler. Bump deliberately, in its own commit, after running the full suite.
+[toolchain]
+channel = "1.97.0"
+components = ["rustfmt", "clippy"]
+profile = "minimal"
