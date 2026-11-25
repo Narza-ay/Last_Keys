@@ -94,9 +94,9 @@ listed first.
 |---|----------|--------------------|--------|
 | 1 | Telemetry legal basis (A-1) | Exempt anonymous metrics on by default, crash reports opt-in; legal review | Phase 7 |
 | 2 | Third-party services for EU residency (A-2) | EU-mirrored breach data, self-hosted crash collection, EU e-mail, content-free push | Phases 3, 7 |
-| 3 | Backup destination (A-3) | Configured sync server only | Phase 3 |
+| 3 | Backup destination (A-3) | **Resolved 2026-11-25**: configured sync server only (official cloud or self-hosted), never silently the official cloud | Phase 3 |
 | 4 | Passkey role in unlocking (K-1) | Passkeys authenticate sessions; vault unlock by device-local key or master password; PRF optional | Phase 5 |
-| 5 | Server authentication protocol (K-2) | OPAQUE over the HKDF-derived auth key | Phase 3 |
+| 5 | Server authentication protocol (K-2) | **Resolved 2026-11-25**: OPAQUE over the HKDF-derived auth key ([ADR-0005](adr/0005-server-authentication-opaque.md), accepted) | Phase 3 |
 | 6 | Revocation policy (K-4) | Rotate account and vault keys, eager item re-encryption | Phase 5 |
 | 7 | Android passkey provider scope (P-1) | Accept Android 14+ for system passkeys | Phase 5 |
 | 8 | Free-tier quotas (D-1) | Define before the official cloud opens | Phase 3 (cloud) |

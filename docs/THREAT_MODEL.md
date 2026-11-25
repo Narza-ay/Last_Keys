@@ -48,7 +48,7 @@ mitigation: ✅ implemented and tested · 📐 designed · ⬜ planned.
 | T2 substitutes the account public keys (to intercept shares or certify a fake device) | Public keys checked against the decrypted private keys at every unlock. | ✅ |
 | T2 injects a device to receive the account key | Only account-signed certificates count; transfers only to certified, non-revoked devices; out-of-band pairing check. | ✅ signatures, 📐 pairing check (Phase 5) |
 | T2 swaps/moves ciphertexts between items, vaults or accounts | Context binding in the AEAD associated data. | ✅ |
-| T2 rolls back an item to an older valid version | Per-item revisions and client-side high-water marks in the sync protocol. | 📐 M3 |
+| T2 rolls back an item to an older valid version | Per-item revisions and client-side high-water marks ([ADR-0008](adr/0008-sync-protocol.md)); binding the revision inside the encrypted content is planned with item schema 2 (until then a server can serve an older ciphertext under a new revision number). | 📐 M3 / schema 2 |
 | T2 withholds updates (freeze attack) | Detectable only partially (device-to-device comparison, P2P). Documented limitation. | 📐 |
 | T1 | TLS 1.2+ (1.3 preferred) in addition to E2EE; certificate validation. | 📐 |
 
