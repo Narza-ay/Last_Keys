@@ -1,6 +1,6 @@
 # API (version 1)
 
-**Status: implemented in `apps/server` (milestone M3, in progress).** Request
+**Status: implemented in `apps/server` (milestone M3).** Request
 and response types are defined in `crates/lk-protocol`; this page is the
 human-readable index. WebSocket notifications are not implemented yet.
 
@@ -54,7 +54,16 @@ Every authenticated request re-checks that the device is not revoked.
 | `GET /v1/vaults` | full | Wrapped vault keys |
 | `PUT /v1/vaults/{vault_id}/key` | full | Store a wrapped vault key |
 | `POST /v1/vaults/{vault_id}/changes` | full | Push changes (idempotent, conflict-detecting, ADR-0008) |
-| `GET /v1/vaults/{vault_id}/changes?since=&limit=` | full | Pull states after a sequence number |
+| `GET /v1/vaults/{vault_id}/changes?since=&limit=` | full | Pull states after a sequence number, with the account's latest sequence number (`head`) and the server history identifier (`history`) |
+
+## Server history and restores
+
+Every pull returns `head` (the account's latest sequence number) and
+`history` (an identifier that `infra/restore.sh` replaces after restoring a
+backup). A client whose cursor is ahead of `head`, or that sees another
+`history`, stops synchronizing with an explicit error; the user then runs a
+full resynchronization (`lk sync --reset`), which uploads every local item
+again and keeps differing versions as conflict copies (ADR-0008, "Restore").
 
 ## Planned
 

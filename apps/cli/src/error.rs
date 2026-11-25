@@ -32,6 +32,12 @@ impl From<lk_sync::SyncError> for CliError {
     fn from(e: lk_sync::SyncError) -> Self {
         match e {
             lk_sync::SyncError::InvalidCredentials => Self::Credentials,
+            rollback @ lk_sync::SyncError::ServerRollback(_) => Self::Message(format!(
+                "{rollback}.\nIf the server administrator restored a backup, run `lk sync --reset`: \
+                 every item of this device is uploaded again and versions that differ from the \
+                 server's are kept as conflict copies (nothing is deleted).\nOtherwise do not \
+                 reset: the server may be misbehaving; contact its administrator."
+            )),
             other => Self::Other(Box::new(other)),
         }
     }

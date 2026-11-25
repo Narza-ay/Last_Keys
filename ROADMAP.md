@@ -1,6 +1,6 @@
 # Roadmap
 
-Updated after every milestone. Last update: **2026-11-25 — M2 completed.**
+Updated after every milestone. Last update: **2026-11-25 — M3 completed.**
 
 The specification defines 8 phases (spec §18). At the owner's request the
 product is delivered **MVP-first**: milestones cut a vertical slice through
@@ -28,7 +28,7 @@ monitoring, P2P sync, documents/attachments, web application, telemetry.
 | M0 | Audit, architecture, documentation, monorepo, CI | 1 | ✅ Done |
 | M1 | Cryptographic core: KDF, envelopes, HPKE, signatures, recovery key, key hierarchy, device identities, certificates, revocation, trusted-device transfer | 2 | ✅ Done |
 | M2 | Vault model (logins, notes, cards, identities, TOTP), password/passphrase generator, local encrypted store (SQLite) with offline queue, `lk` CLI for end-to-end verification, HPKE cross-implementation vector | 2, 4 | ✅ Done (KDF device campaign carried over: needs physical devices) |
-| M3 | Server: OPAQUE authentication, device registry, encrypted sync with change log and conflict handling, revocation enforcement, PostgreSQL, Docker Compose self-hosting, backup/restore | 3 | 🚧 In progress: authentication, devices, revocation and sync endpoints done; client sync engine and Docker Compose packaging next |
+| M3 | Server: OPAQUE authentication, device registry, encrypted sync with change log and conflict handling, revocation enforcement, PostgreSQL, Docker Compose self-hosting, backup/restore | 3 | ✅ Done (phase gate partial: V-Y2, V-Y3, V-Y5, V-Y7 carried over, see the log) |
 | M4 | Desktop app (Tauri 2): unlock, vault browsing/editing, generator, TOTP, devices, settings, FR/EN, light/dark/system | 6 | ⬜ |
 | M5 | Browser extension (Chrome, Brave, Firefox): login-form detection, safe domain matching, fill, save, generate | 6 | ⬜ |
 | M6 | NordPass importer (local file, preview, duplicates, report) | 4 | ⬜ |
@@ -72,12 +72,35 @@ in browsers (V-C8) — requires hardware and the WASM harness of M4/M5.
 Remaining risks: OPAQUE not yet prototyped; crash-injection tests of the
 store (V-S2) partial (rollback tested, power-loss simulation pending).
 
-### M3 (in progress) — 2026-11-25
-Owner approved OPAQUE (ADR-0005) and the backup destination policy.
-Delivered so far: ADR-0008 (sync protocol), ADR-0009 (server stack),
-`lk-auth` (OPAQUE), `lk-protocol` (API v1), `lk-server` with accounts,
-OPAQUE login, device-bound sessions, devices and revocation, vault keys,
-push/pull synchronization, rate limits; 26 integration tests against a real
-PostgreSQL. Remaining in M3: client sync engine with conflict copies and
-CLI commands (`register`, `login`, `sync`, `devices`, `revoke`), Docker
-Compose stack with TLS, backup/restore scripts and a CI smoke test.
+### M3 — 2026-11-25
+Owner approved OPAQUE (ADR-0005) and the backup destination policy
+(configured sync server only).
+Delivered: ADR-0008 (sync protocol), ADR-0009 (server stack), `lk-auth`
+(OPAQUE, RFC 9807), `lk-protocol` (API v1), `lk-server` (accounts, OPAQUE
+login, device-bound sessions, device registry and revocation, vault keys,
+push/pull synchronization with server revisions, conflicts and tombstones,
+rate limits, body limits), `lk-sync` (client engine with conflict copies,
+rollback detection and full resynchronization after a restore), `lk-store`
+schema v3 with tested migrations, CLI commands `register`, `login`, `sync`
+(`--reset`), `devices`, `revoke`, Docker Compose
+self-hosting (Caddy TLS, PostgreSQL 16, Docker secrets, unprivileged
+read-only server container, health checks) with backup/restore scripts, and
+a CI smoke test that destroys every volume, restores an older backup,
+resynchronizes and enrolls a new device. V-Y1, V-Y4 and V-Y6 met. 223 tests
+plus the smoke scenario.
+
+Carried over (tracked in [AUDIT.md §3.3](docs/AUDIT.md#33-server-and-synchronization-phase-3)):
+* V-Y3 randomized simulation (≥ 5 devices, ≥ 10 000 operations) and the
+  V-Y2 property test — recommended before the v0.1 release candidate;
+* V-Y5 systematic per-endpoint negative matrix;
+* V-Y7 timed clean-host run, upgrade from a previous release (needs a first
+  release), arm64 images;
+* finer resynchronization after a server restore (fast-forward instead of
+  conflict copies, ADR-0008 "Restore");
+* push notifications (WebSocket) — clients synchronize on demand for now;
+* e-mail verification; vault-key rotation after revocation (M7);
+* free-tier quotas (AUDIT D-1) before the official cloud opens.
+
+Remaining risks: RUSTSEC-2026-0387 accepted as unlinked (guarded in CI) until
+`opaque-ke` 5 is stable; the sync engine is exercised by deterministic
+scenarios only until the V-Y3 simulation exists.

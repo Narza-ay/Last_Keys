@@ -1,12 +1,13 @@
 # `lk` — command-line client
 
-**Status: implemented (milestone M2), local only.** Synchronization arrives
-with the server in M3. English-only developer and power-user tool; the
+**Status: implemented (milestones M2 and M3): local vault and
+synchronization.** English-only developer and power-user tool; the
 graphical applications provide the French/English interface.
 
-`lk` exercises the complete local stack end to end: key hierarchy
-(`lk-core`), vault model (`lk-vault`), local encrypted store (`lk-store`),
-generator (`lk-generator`) and TOTP (`lk-totp`).
+`lk` exercises the complete stack end to end: key hierarchy (`lk-core`),
+vault model (`lk-vault`), local encrypted store (`lk-store`), generator
+(`lk-generator`), TOTP (`lk-totp`) and synchronization with a Last Keys
+server (`lk-sync`).
 
 ## Build
 
@@ -35,6 +36,20 @@ lk --recovery-key passwd                  # reset a forgotten master password wi
 lk recovery rotate                        # replace the recovery key
 lk info
 ```
+
+Synchronization (server: [docs/SELF_HOSTING.md](../../docs/SELF_HOSTING.md)):
+
+```bash
+lk register --server https://sync.example --email you@example.com  # first device: asks for the recovery key too
+lk login --server https://sync.example --email you@example.com     # any other device: creates its local vault
+lk sync                                   # pull, push, merge (conflict copies, never overwrites)
+lk sync --reset                           # only after the server was restored from a backup
+lk devices                                # list devices, verified with the account key
+lk revoke <device-id>                     # the device loses access at its next request
+```
+
+Plain `http://` is refused except to the local machine. Changing the master
+password or rotating the recovery key also updates the server credential.
 
 `<id>` is the item ID or a prefix of at least 4 characters (as shown by
 `lk list`). The vault file defaults to `$LK_VAULT`, then

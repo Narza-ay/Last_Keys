@@ -30,7 +30,7 @@ use rusqlite::{Connection, OpenFlags, OptionalExtension, Transaction, params};
 use thiserror::Error;
 
 /// Database schema version written by this build.
-pub const SCHEMA_VERSION: i64 = 2;
+pub const SCHEMA_VERSION: i64 = 3;
 
 /// Forward-only migrations; entry `i` upgrades version `i` to `i + 1`.
 const MIGRATIONS: &[&str] = &[
@@ -83,6 +83,10 @@ CREATE TABLE remote (
     server_url  TEXT NOT NULL,
     email       TEXT NOT NULL
 );
+",
+    r"
+-- v3: identifier of the server history each vault was synchronized with.
+ALTER TABLE sync_state ADD COLUMN server_history TEXT;
 ",
 ];
 
@@ -769,17 +773,73 @@ impl Store {
         Ok(())
     }
 
-    /// Forgets the known server revision of an item (the server no longer
-    /// knows it), so that the next push re-creates it.
+    /// Identifier of the server history the vault was last synchronized
+    /// with (`None` before the first pull and after [`Self::reset_sync`]).
     ///
     /// # Errors
     /// Database errors.
-    pub fn reset_server_revision(&mut self, item_id: &ItemId) -> Result<()> {
+    pub fn sync_history(&self, vault_id: &VaultId) -> Result<Option<String>> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT server_history FROM sync_state WHERE vault_id = ?1",
+                params![vault_id.to_string()],
+                |r| r.get(0),
+            )
+            .optional()?
+            .flatten())
+    }
+
+    /// Records the server history identifier of a vault.
+    ///
+    /// # Errors
+    /// Database errors.
+    pub fn set_sync_history(&mut self, vault_id: &VaultId, history: &str) -> Result<()> {
         self.conn.execute(
-            "UPDATE items SET server_revision = 0 WHERE item_id = ?1",
-            params![item_id.to_string()],
+            "INSERT INTO sync_state (vault_id, cursor, server_history) VALUES (?1, 0, ?2)
+             ON CONFLICT (vault_id) DO UPDATE SET server_history = excluded.server_history",
+            params![vault_id.to_string(), history],
         )?;
         Ok(())
+    }
+
+    /// Prepares a full resynchronization of a vault, for when the server's
+    /// data went back in time (backup restored): the cursor, the server
+    /// history and every known server revision are forgotten, and every live
+    /// item is queued for upload, atomically. Nothing local is deleted; the
+    /// next synchronization keeps differing versions as conflict copies.
+    /// Returns the number of items queued.
+    ///
+    /// # Errors
+    /// Database errors.
+    pub fn reset_sync(&mut self, vault_id: &VaultId, now_unix: u64) -> Result<usize> {
+        let vault = vault_id.to_string();
+        let tx = self.conn.transaction()?;
+        tx.execute("DELETE FROM sync_state WHERE vault_id = ?1", params![vault])?;
+        tx.execute(
+            "UPDATE items SET server_revision = 0 WHERE vault_id = ?1",
+            params![vault],
+        )?;
+        let live: Vec<(String, i64)> = {
+            let mut stmt = tx.prepare(
+                "SELECT item_id, revision FROM items WHERE vault_id = ?1 AND deleted = 0
+                 ORDER BY item_id",
+            )?;
+            stmt.query_map(params![vault], |r| Ok((r.get(0)?, r.get(1)?)))?
+                .collect::<rusqlite::Result<_>>()?
+        };
+        for (item_id, revision) in &live {
+            queue_change(
+                &tx,
+                &parse_id(item_id)?,
+                vault_id,
+                to_u64(*revision)?,
+                ChangeKind::Upsert,
+                now_unix,
+            )?;
+        }
+        tx.commit()?;
+        Ok(live.len())
     }
 }
 

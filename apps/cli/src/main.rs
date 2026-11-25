@@ -24,7 +24,8 @@ use lk_generator::{PassphrasePolicy, PasswordPolicy, generate_passphrase, genera
 use lk_protocol::CredentialKind;
 use lk_store::{Store, StoredItem};
 use lk_sync::{
-    Api, SyncReport, UreqTransport, enroll_device, login_registered, register_account, sync_vault,
+    Api, SyncReport, UreqTransport, enroll_device, login_registered, register_account,
+    resync_vault, sync_vault,
 };
 use lk_totp::Totp;
 use lk_vault::{
@@ -131,7 +132,13 @@ enum Command {
         device_name: String,
     },
     /// Synchronize with the server.
-    Sync,
+    Sync {
+        /// Full resynchronization after the server was restored from a
+        /// backup: every local item is uploaded again; versions that differ
+        /// from the server's are kept as conflict copies (nothing is deleted).
+        #[arg(long)]
+        reset: bool,
+    },
     /// List the account's devices (verified with the account key).
     Devices,
     /// Revoke a device (it immediately loses access to the server).
@@ -318,7 +325,7 @@ fn run(cli: Cli) -> Result<()> {
                 Command::Passwd => session.passwd(&mut input),
                 Command::Recovery(RecoveryCommand::Rotate) => session.rotate_recovery(),
                 Command::Register { server, email } => session.register(&mut input, server, email),
-                Command::Sync => session.sync().map(|_| ()),
+                Command::Sync { reset } => session.sync(*reset).map(|_| ()),
                 Command::Devices => session.devices(),
                 Command::Revoke { device } => session.revoke(device),
                 Command::Generate(_) | Command::Init { .. } | Command::Login { .. } => Ok(()),
@@ -608,17 +615,24 @@ impl Session {
         self.store
             .set_remote(&lk_sync::normalize_server_url(server)?, &email)?;
         println!("Registered {email} on {server}.");
-        self.sync()?;
+        self.sync(false)?;
         Ok(())
     }
 
-    fn sync(&mut self) -> Result<SyncReport> {
+    fn sync(&mut self, reset: bool) -> Result<SyncReport> {
         let (api, email) = self.remote_required()?;
         let session = self.full_session(&api, &email)?;
         let mut total = SyncReport::default();
+        if reset {
+            println!("Full resynchronization: every item of this device is uploaded again.");
+        }
         for wrapped in self.store.wrapped_vault_keys()? {
             let vault = self.keys.open_vault_key(&wrapped)?;
-            let r = sync_vault(&api, &session, &mut self.store, &vault, &wrapped, now())?;
+            let r = if reset {
+                resync_vault(&api, &session, &mut self.store, &vault, &wrapped, now())?
+            } else {
+                sync_vault(&api, &session, &mut self.store, &vault, &wrapped, now())?
+            };
             total.pulled = total.pulled.saturating_add(r.pulled);
             total.pushed = total.pushed.saturating_add(r.pushed);
             total.conflicts = total.conflicts.saturating_add(r.conflicts);

@@ -30,9 +30,16 @@ pub enum SyncError {
     /// This device has been revoked.
     #[error("this device has been revoked")]
     DeviceRevoked,
-    /// The server answered something unexpected (malformed, rollback, ...).
+    /// The server answered something unexpected (malformed, inconsistent).
     #[error("server response failed an integrity check: {0}")]
     Integrity(&'static str),
+    /// The server's data is older than what this device already
+    /// synchronized: a backup was restored, or the server misbehaves.
+    /// Synchronization stops until the user asks for a full
+    /// resynchronization ([`crate::resync_vault`]), which never deletes local
+    /// data.
+    #[error("the server's data is older than this device's last synchronization ({0})")]
+    ServerRollback(&'static str),
     /// OPAQUE failure.
     #[error(transparent)]
     Auth(#[from] lk_auth::AuthError),

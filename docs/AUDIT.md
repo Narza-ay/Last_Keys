@@ -138,15 +138,15 @@ marked ✅ are already met (with the evidence named); the others are targets.
 
 ### 3.3 Server and synchronization (Phase 3)
 
-| ID | Criterion |
-|----|-----------|
-| V-Y1 | The server never receives plaintext or keys: canary strings never appear in database dumps, object storage, logs or traces. |
-| V-Y2 | Idempotence: replaying any sequence of change batches yields the same state (property test). |
-| V-Y3 | No lost writes: randomized simulation with ≥ 5 devices, offline periods, reordering and duplication over ≥ 10 000 operations keeps every concurrent version (conflict copies), with tombstones for deletions. |
-| V-Y4 | Revocation: a revoked device is refused on every endpoint at its next request; its sessions are invalidated server-side. |
-| V-Y5 | Authorization is enforced server-side on every endpoint (automated negative tests for cross-account access, IDOR, replay). |
-| V-Y6 | Rate limiting and request size limits on authentication, enrollment and upload endpoints. |
-| V-Y7 | Self-hosting: `docker compose up` on a clean host reaches healthy in ≤ 5 min; backup → restore round-trip verified; upgrade from the previous release runs migrations without data loss; amd64 and arm64 images. |
+| ID | Criterion | Status |
+|----|-----------|--------|
+| V-Y1 | The server never receives plaintext or keys: canary strings never appear in database dumps, object storage, logs or traces. | ✅ database (server tests on the item, bundle, vault-key and change tables; plain `pg_dump` of the Compose stack) and server logs (Compose smoke test, which also checks the e-mail is not logged). No object storage or trace export exists yet: re-test when attachments arrive |
+| V-Y2 | Idempotence: replaying any sequence of change batches yields the same state (property test). | ⬜ partial: replayed changes and duplicated batches return the recorded outcome (`replays_are_idempotent`), client retries are safe (`offline_edits_are_folded_and_retries_are_safe`); property test over arbitrary sequences pending (with V-Y3) |
+| V-Y3 | No lost writes: randomized simulation with ≥ 5 devices, offline periods, reordering and duplication over ≥ 10 000 operations keeps every concurrent version (conflict copies), with tombstones for deletions. | ⬜ carried over: deterministic 2–3-device scenarios only (conflict copies, delete against edit, offline edits); the randomized simulation is not written yet |
+| V-Y4 | Revocation: a revoked device is refused on every endpoint at its next request; its sessions are invalidated server-side. | ✅ every authenticated route goes through the same session check, which rejects sessions of revoked devices; tested: next request refused, sessions deleted, login refused, revocation permanent (`devices`, `client_sync`, CLI end to end) |
+| V-Y5 | Authorization is enforced server-side on every endpoint (automated negative tests for cross-account access, IDOR, replay). | ⬜ partial: cross-account reads and writes, vault-key planting, enrollment-scope restrictions, foreign certificates, bundle swaps, single-use login attempts and replays are tested; a systematic per-endpoint negative matrix is pending |
+| V-Y6 | Rate limiting and request size limits on authentication, enrollment and upload endpoints. | ✅ per-IP and per-e-mail limit on authentication endpoints (`authentication_endpoints_are_rate_limited`); 256 KiB and 32 MiB body limits (`oversized_requests_are_refused`) |
+| V-Y7 | Self-hosting: `docker compose up` on a clean host reaches healthy in ≤ 5 min; backup → restore round-trip verified; upgrade from the previous release runs migrations without data loss; amd64 and arm64 images. | ⬜ partial: start from nothing, health, backup → destruction of every volume → restore of an older backup → detection by clients → `lk sync --reset` → nothing lost, verified on every CI run (`compose-smoke`, amd64); the stack is healthy within seconds once the image is built. Pending: timed run on a clean host, upgrade from a previous release (needs a first release), arm64 images |
 
 ### 3.4 Clients and autofill (Phase 6)
 

@@ -10,3 +10,7 @@
 .env
 *.lkvault
 *.lkexport
+# Self-hosting runtime files
+infra/.env
+infra/secrets/
+infra/backups/

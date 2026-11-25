@@ -247,6 +247,16 @@ fn two_cli_devices_synchronize_through_the_server() {
     ));
     assert!(ok(&lk(&a, &["sync"], &[reset])).contains("Synchronized"));
 
+    // A full resynchronization against a healthy server changes nothing:
+    // every item is identical on both sides, nothing is sent or copied.
+    let before = ok(&lk(&a, &["list"], &[reset]));
+    let resync = ok(&lk(&a, &["sync", "--reset"], &[reset]));
+    assert!(
+        resync.contains("0 sent, 0 conflict(s)") && !resync.contains("conflict copy"),
+        "{resync}"
+    );
+    assert_eq!(ok(&lk(&a, &["list"], &[reset])), before);
+
     // A third device can enroll with the reset password.
     let c = dir.path().join("c.lkvault");
     assert!(

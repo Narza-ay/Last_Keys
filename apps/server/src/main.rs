@@ -27,8 +27,11 @@ fn main() -> ExitCode {
             None => Err("usage: lk-server generate-secret <path>".to_owned()),
         },
         Some("migrate") => run_async(migrate()),
+        Some("healthcheck") => healthcheck(),
         Some("serve") => run_async(serve()),
-        _ => Err("usage: lk-server <generate-secret PATH | migrate | serve>".to_owned()),
+        _ => Err(
+            "usage: lk-server <generate-secret PATH | migrate | serve | healthcheck>".to_owned(),
+        ),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -85,8 +88,54 @@ fn load_secret() -> Result<ServerSecret, String> {
     ServerSecret::from_bytes(&bytes).map_err(|_| "server secret file is not valid".to_owned())
 }
 
+/// `LK_DATABASE_URL`, or the content of the file named by
+/// `LK_DATABASE_URL_FILE` (Docker secret: keeps the password out of the
+/// environment).
 fn database_url() -> Result<String, String> {
-    std::env::var("LK_DATABASE_URL").map_err(|_| "LK_DATABASE_URL is not set".to_owned())
+    if let Ok(path) = std::env::var("LK_DATABASE_URL_FILE") {
+        let url = std::fs::read_to_string(&path)
+            .map_err(|e| format!("cannot read LK_DATABASE_URL_FILE: {e}"))?;
+        let url = url.trim().to_owned();
+        if url.is_empty() {
+            return Err("LK_DATABASE_URL_FILE is empty".to_owned());
+        }
+        return Ok(url);
+    }
+    std::env::var("LK_DATABASE_URL")
+        .map_err(|_| "LK_DATABASE_URL or LK_DATABASE_URL_FILE must be set".to_owned())
+}
+
+/// Container health probe: `GET /v1/health` on the local listener, success
+/// only on HTTP 200 (which also proves the database is reachable).
+fn healthcheck() -> Result<(), String> {
+    use std::io::{Read, Write};
+    use std::net::TcpStream;
+    use std::time::Duration;
+
+    let bind = std::env::var("LK_BIND").unwrap_or_else(|_| "0.0.0.0:8080".to_owned());
+    let port = bind.rsplit_once(':').map_or("8080", |(_, p)| p);
+    let mut stream =
+        TcpStream::connect(format!("127.0.0.1:{port}")).map_err(|e| format!("connect: {e}"))?;
+    stream
+        .set_read_timeout(Some(Duration::from_secs(5)))
+        .map_err(|e| e.to_string())?;
+    stream
+        .write_all(b"GET /v1/health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+        .map_err(|e| format!("write: {e}"))?;
+    let mut response = Vec::new();
+    stream
+        .take(4096)
+        .read_to_end(&mut response)
+        .map_err(|e| format!("read: {e}"))?;
+    let status_line = response.split(|b| *b == b'\n').next().unwrap_or_default();
+    if status_line.starts_with(b"HTTP/1.1 200") {
+        Ok(())
+    } else {
+        Err(format!(
+            "unhealthy: {}",
+            String::from_utf8_lossy(status_line).trim()
+        ))
+    }
 }
 
 fn init_logging() {

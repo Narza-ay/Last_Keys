@@ -1,0 +1,17 @@
+{
+	# The admin API is not needed in this deployment.
+	admin off
+}
+
+{$LK_DOMAIN} {
+	reverse_proxy server:8080
+	request_body {
+		max_size 33MB
+	}
+	header {
+		Strict-Transport-Security "max-age=63072000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+}

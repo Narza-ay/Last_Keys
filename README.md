@@ -6,10 +6,11 @@ Last Keys is a premium, cross-platform password manager and digital identity
 vault with end-to-end encryption, independent device identities, offline use,
 cloud, self-hosted and peer-to-peer synchronization.
 
-> **Project status — milestone M2 (2026-11-25).** The cryptographic core,
-> the vault model, the local encrypted store and the `lk` command-line client
-> work end to end on one device. There is **no graphical application and no
-> server yet**. See the [roadmap](ROADMAP.md) for what comes next and
+> **Project status — milestone M3 (2026-11-25).** The cryptographic core,
+> the vault model, the local encrypted store, the synchronization server
+> (self-hostable with Docker Compose) and the `lk` command-line client work
+> end to end across several devices. There is **no graphical application
+> yet**. See the [roadmap](ROADMAP.md) for what comes next and
 > [known limitations](docs/KNOWN_LIMITATIONS.md) for what does not work.
 
 ## What exists today
@@ -21,10 +22,14 @@ cloud, self-hosted and peer-to-peer synchronization.
 | `crates/lk-generator` — passwords and passphrases (OS CSPRNG, exact entropy) | ✅ implemented, tested |
 | `crates/lk-totp` — HOTP/TOTP (RFC 4226/6238), `otpauth://` URIs | ✅ implemented, tested |
 | `crates/lk-vault` — item schema v1 (logins, notes, cards, identities), validation, password history | ✅ implemented, tested, fuzzed |
-| `crates/lk-store` — local encrypted SQLite store with offline change queue | ✅ implemented, tested |
-| `apps/cli` — `lk` command-line client (local) | ✅ implemented, tested end to end |
-| CI: format, Clippy, tests on Linux/Windows/macOS, WebAssembly check, dependency policy, docs, nightly fuzzing | ✅ configured |
-| Server, desktop, browser extension, mobile, web | ⬜ not started — see [`apps/`](apps) |
+| `crates/lk-store` — local encrypted SQLite store with offline change queue and sync state | ✅ implemented, tested |
+| `crates/lk-auth`, `crates/lk-protocol` — OPAQUE authentication (RFC 9807), API v1 types | ✅ implemented, tested |
+| `crates/lk-sync` — client synchronization engine (conflict copies, rollback detection) | ✅ implemented, tested against the real server |
+| `apps/server` — synchronization server (axum, PostgreSQL 16) | ✅ implemented, tested against PostgreSQL |
+| `infra/` — Docker Compose self-hosting (Caddy TLS, backup/restore) | ✅ verified by an end-to-end smoke test in CI |
+| `apps/cli` — `lk` command-line client (local vault and synchronization) | ✅ implemented, tested end to end |
+| CI: format, Clippy, tests on Linux/Windows/macOS, server tests on PostgreSQL, Compose smoke test, WebAssembly check, dependency policy, docs, nightly fuzzing | ✅ configured |
+| Desktop, browser extension, mobile, web | ⬜ not started — see [`apps/`](apps) |
 
 ## Build and test
 
@@ -32,9 +37,11 @@ Requirements: Rust via `rustup` (the pinned toolchain in
 `rust-toolchain.toml` installs automatically).
 
 ```bash
-cargo test --workspace --locked
+cargo test --workspace --locked --exclude lk-server   # server tests need PostgreSQL, see docs/TESTING.md
 cargo run --release -p lk-cli -- --help
 ```
+
+Self-hosting the server: [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md).
 
 Full verification commands: [docs/TESTING.md](docs/TESTING.md).
 
@@ -53,7 +60,7 @@ Full verification commands: [docs/TESTING.md](docs/TESTING.md).
 | [docs/PLATFORM_COMPATIBILITY.md](docs/PLATFORM_COMPATIBILITY.md) | What is verified on which platform |
 | [docs/PRIVACY.md](docs/PRIVACY.md) | What the server can and cannot see |
 | [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md) | Current and permanent limitations |
-| [docs/API.md](docs/API.md), [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md) | Server-side documentation (planned components) |
+| [docs/API.md](docs/API.md), [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md) | Server API, CI and deployment, self-hosting |
 | [docs/adr/](docs/adr) | Architecture decision records |
 | [CONTRIBUTING.md](CONTRIBUTING.md), [CHANGELOG.md](CHANGELOG.md) | Workflow and history |
 

@@ -6,19 +6,37 @@ semantic versioning once releases begin.
 
 ## [Unreleased]
 
-### Added — M3 (in progress, 2026-11-25)
-- ADR-0005 accepted (OPAQUE), ADR-0008 (sync protocol), ADR-0009 (server
-  stack); AUDIT decisions 3 and 5 resolved.
+### Added — M3: server and synchronization (2026-11-25)
+- ADR-0005 accepted (OPAQUE), ADR-0008 (sync protocol, amended with the
+  restore procedure), ADR-0009 (server stack); AUDIT decisions 3 and 5
+  resolved.
 - `lk-auth`: OPAQUE registration and login (opaque-ke 4.0.1), session tokens
   derived from the OPAQUE session key and stored hashed.
 - `lk-protocol`: API v1 types.
 - `lk-server`: pre-login, registration, login, sessions (full, enrollment,
   recovery), credential replacement, devices and revocation, vault keys,
-  push/pull synchronization, rate limits, migrations; `generate-secret`,
-  `migrate`, `serve` commands.
+  push/pull synchronization with a server history identifier, rate limits,
+  body limits, migrations; `generate-secret`, `migrate`, `serve`,
+  `healthcheck` commands; secrets and database URL readable from files.
+- `lk-sync`: typed API client over HTTPS (rustls, platform certificate
+  verifier; plain HTTP only to the local machine), account registration,
+  device enrollment, sync engine (pull, push, conflict copies without
+  duplicates, rollback detection, full resynchronization after a restore).
+- `lk-store`: schema v2 (server revisions, cursors, remote) and v3 (server
+  history), with migrations tested from the frozen v1 schema.
+- `lk` CLI: `register`, `login`, `sync` (`--reset`), `devices`, `revoke`;
+  password change and recovery-key rotation update the server credential.
+- Self-hosting: `infra/` Dockerfile (unprivileged, read-only container,
+  health check), Docker Compose stack with Caddy (automatic TLS) and
+  PostgreSQL 16 on an internal network, Docker secrets, `setup.sh`,
+  `backup.sh`, `restore.sh` (starts a new server history).
 - Security: RUSTSEC-2026-0387 exception justified by proof that the affected
-  code is not linked, enforced by the `advisory-guard` CI job.
-- CI: server integration tests with a PostgreSQL 16 service.
+  code is not linked, enforced by the `advisory-guard` CI job; canary checks
+  on database dumps and server logs (V-Y1).
+- CI: server, synchronization and CLI end-to-end tests with a PostgreSQL 16
+  service; Compose smoke test (TLS, registration, sync, backup, volume
+  destruction, restore of an older backup, resynchronization, new device);
+  Dependabot for the Docker base images.
 
 ### Added — M2: local vault (2026-11-25)
 - `lk-generator`: password generator (classes, minimums, exclusions,

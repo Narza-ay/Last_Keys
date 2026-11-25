@@ -20,7 +20,7 @@ use lk_crypto::{KdfParams, MasterPassword};
 use lk_store::Store;
 use lk_sync::{
     Api, SyncError, SyncReport, UreqTransport, enroll_device, login_registered, register_account,
-    sync_vault,
+    resync_vault, sync_vault,
 };
 use lk_vault::{ItemContent, ItemData, SecureNote, codec};
 
@@ -88,6 +88,14 @@ impl Device {
     }
 
     fn sync(&self, url: &str) -> Result<SyncReport, SyncError> {
+        self.run(url, false, NOW + 10)
+    }
+
+    fn resync(&self, url: &str, now: u64) -> Result<SyncReport, SyncError> {
+        self.run(url, true, now)
+    }
+
+    fn run(&self, url: &str, reset: bool, now: u64) -> Result<SyncReport, SyncError> {
         let api = Api::new(UreqTransport::new(url).unwrap());
         let store = self.store();
         let keys = PasswordKeys::derive(
@@ -97,14 +105,38 @@ impl Device {
         .unwrap();
         let session = login_registered(&api, EMAIL, &keys, &self.identity)?;
         let mut store = store;
-        sync_vault(
-            &api,
-            &session,
-            &mut store,
-            &self.vault,
-            &self.wrapped,
-            NOW + 10,
-        )
+        let pass = if reset { resync_vault } else { sync_vault };
+        pass(&api, &session, &mut store, &self.vault, &self.wrapped, now)
+    }
+}
+
+/// What `infra/backup.sh` captures of the synchronization data, kept in the
+/// test database itself.
+async fn backup(server: &TestServer) {
+    for sql in [
+        "CREATE TABLE backup_items AS SELECT * FROM items",
+        "CREATE TABLE backup_applied AS SELECT * FROM applied_changes",
+        "CREATE TABLE backup_seq AS SELECT * FROM account_seq",
+    ] {
+        sqlx::query(sql).execute(&server.pool).await.unwrap();
+    }
+}
+
+/// Puts the backed-up synchronization data back, as `pg_restore` does; with
+/// `new_history`, also what `infra/restore.sh` does afterwards.
+async fn restore(server: &TestServer, new_history: bool) {
+    let mut statements = vec![
+        "DELETE FROM applied_changes",
+        "DELETE FROM items",
+        "INSERT INTO items SELECT * FROM backup_items",
+        "INSERT INTO applied_changes SELECT * FROM backup_applied",
+        "UPDATE account_seq a SET last_seq = b.last_seq FROM backup_seq b WHERE a.account_id = b.account_id",
+    ];
+    if new_history {
+        statements.push("UPDATE server_meta SET history_id = gen_random_uuid()");
+    }
+    for sql in statements {
+        sqlx::query(sql).execute(&server.pool).await.unwrap();
     }
 }
 
@@ -243,7 +275,11 @@ async fn two_devices_converge_and_never_lose_a_version() {
         b.edit(&wifi, "same new password");
         a.sync(&url).unwrap();
         let r = b.sync(&url).unwrap();
-        assert_eq!((r.conflicts, r.conflict_copies.len()), (1, 0));
+        assert_eq!(
+            (r.conflicts, r.conflict_copies.len()),
+            (0, 0),
+            "the same edit on both devices is not a conflict"
+        );
 
         // Deletion propagates.
         a.delete(&wifi);
@@ -380,6 +416,117 @@ async fn wrong_password_cannot_enroll() {
             NOW,
         );
         assert!(matches!(unknown, Err(SyncError::InvalidCredentials)));
+    })
+    .await;
+    server.cleanup().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn restored_backup_is_detected_and_resync_keeps_every_version() {
+    let server = TestServer::default().await;
+    let url = server.serve_http().await;
+    let u = url.clone();
+    let (a, b, bank) = blocking(move || {
+        let a = first_device(&u);
+        let bank = a.add("Bank", "pin 1");
+        a.add("Wifi", "w1");
+        a.sync(&u).unwrap();
+        let b = new_device(&u, "B");
+        b.sync(&u).unwrap();
+        (a, b, bank)
+    })
+    .await;
+    backup(&server).await;
+
+    // After the backup: a new item and an edit, seen by both devices.
+    let u = url.clone();
+    let (a, b) = blocking(move || {
+        a.add("Late", "created after the backup");
+        a.edit(&bank, "pin 2");
+        assert_eq!(a.sync(&u).unwrap().pushed, 2);
+        assert_eq!(b.sync(&u).unwrap().pulled, 2);
+        assert_eq!(a.contents(), b.contents());
+        (a, b)
+    })
+    .await;
+    restore(&server, true).await;
+
+    let u = url.clone();
+    blocking(move || {
+        // Both devices refuse the older server and keep their data.
+        let before = a.contents();
+        assert!(matches!(a.sync(&u), Err(SyncError::ServerRollback(_))));
+        assert!(matches!(b.sync(&u), Err(SyncError::ServerRollback(_))));
+        assert_eq!(a.contents(), before);
+
+        // Resynchronization: the missing item is uploaded again; the edit
+        // the server lost is kept as a conflict copy.
+        let expected = vec![
+            ("Bank".to_owned(), "pin 1".to_owned()),
+            ("Bank (conflict copy)".to_owned(), "pin 2".to_owned()),
+            ("Late".to_owned(), "created after the backup".to_owned()),
+            ("Wifi".to_owned(), "w1".to_owned()),
+        ];
+        let r = a.resync(&u, NOW + 100).unwrap();
+        assert_eq!(r.conflict_copies.len(), 1);
+        assert_eq!(a.contents(), expected);
+        // B finds A's copy and does not create the same one again, although
+        // its copy would carry another modification time.
+        let r = b.resync(&u, NOW + 200).unwrap();
+        assert!(r.conflict_copies.is_empty(), "{r:?}");
+        assert_eq!(b.contents(), expected);
+        assert_eq!(a.sync(&u).unwrap(), SyncReport::default());
+
+        // Normal synchronization resumes on the new history.
+        b.edit(&bank, "pin 3");
+        b.sync(&u).unwrap();
+        a.sync(&u).unwrap();
+        assert!(a.contents().contains(&("Bank".into(), "pin 3".into())));
+        // A device enrolled now receives every version exactly once.
+        let c = new_device(&u, "C");
+        c.sync(&u).unwrap();
+        assert_eq!(c.contents(), a.contents());
+        assert_eq!(c.contents().len(), 4);
+    })
+    .await;
+    server.cleanup().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn restore_without_new_history_is_still_detected() {
+    let server = TestServer::default().await;
+    let url = server.serve_http().await;
+    let u = url.clone();
+    let a = blocking(move || {
+        let a = first_device(&u);
+        a.add("One", "1");
+        a.sync(&u).unwrap();
+        a
+    })
+    .await;
+    backup(&server).await;
+    let u = url.clone();
+    let a = blocking(move || {
+        let two = a.add("Two", "2");
+        a.sync(&u).unwrap();
+        a.edit(&two, "2b");
+        a.sync(&u).unwrap();
+        a
+    })
+    .await;
+    // A restore that forgot to replace the history identifier.
+    restore(&server, false).await;
+    let u = url.clone();
+    blocking(move || {
+        // The cursor is ahead of the server: refused.
+        assert!(matches!(a.sync(&u), Err(SyncError::ServerRollback(_))));
+        let r = a.resync(&u, NOW + 100).unwrap();
+        assert_eq!(r.pushed, 1, "only the lost item is uploaded again");
+        assert!(r.conflict_copies.is_empty());
+        assert_eq!(
+            a.contents(),
+            vec![("One".into(), "1".into()), ("Two".into(), "2b".into())]
+        );
     })
     .await;
     server.cleanup().await;

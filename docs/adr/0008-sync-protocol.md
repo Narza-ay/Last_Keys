@@ -64,6 +64,31 @@ No branch discards a version the user wrote.
   2); device-to-device comparison (P2P, M14) narrows the freeze window. Both
   are recorded in the threat model.
 
+### Restore (amended 2026-11-25, M3)
+Restoring a server backup makes the server's data older than what clients
+already synchronized, exactly like a rollback attack; the two cannot be told
+apart, so the client treats both the same way and never resolves it silently:
+* every pull also returns `head` (the account's latest `seq`) and `history`,
+  an identifier stored by the server (`server_meta`) and replaced by
+  `infra/restore.sh` after every restore;
+* the client stores `history` per vault; another value, a cursor ahead of
+  `head`, or an item revision lower than the one already seen stops the pass
+  with `ServerRollback`;
+* recovery is an explicit user action (`lk sync --reset`, `resync_vault`):
+  cursor, history and known revisions are forgotten and every live local item
+  is pushed again with base revision 0. Items the server lost are re-created;
+  identical items are adopted; a differing local version is kept as a
+  conflict copy (the original item takes the server's version). Copies are
+  not duplicated when an identical item already exists (for instance a copy
+  created by another device's resynchronization). Nothing local is deleted.
+* Known consequence: a version written after the backup comes back as a
+  conflict copy rather than as the current version, and deletions made after
+  the backup reappear. A finer resynchronization that recognizes the restored
+  state as an ancestor of the client's (and fast-forwards instead of copying)
+  needs per-state provenance from the server; it is deferred because a
+  revision comparison alone could silently overwrite edits made after the
+  restore by newly enrolled devices.
+
 ### Real time
 A WebSocket (`/v1/events`) only notifies "changes available" (no content);
 clients then pull. Polling is the fallback. (Delivered after the HTTP

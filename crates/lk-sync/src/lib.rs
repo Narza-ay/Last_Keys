@@ -16,7 +16,7 @@ pub mod transport;
 
 pub use account::{Enrollment, enroll_device, login_registered, register_account};
 pub use api::{Api, Session};
-pub use engine::{CONFLICT_SUFFIX, SyncReport, sync_vault};
+pub use engine::{CONFLICT_SUFFIX, SyncReport, resync_vault, sync_vault};
 pub use error::{Result, SyncError};
 #[cfg(feature = "http")]
 pub use transport::UreqTransport;

@@ -18,7 +18,15 @@ distributions (glibc-based x86_64 and arm64 first).
 | WebAssembly (`wasm32-unknown-unknown`) | 🔧 | CI `cargo check` of `lk-crypto`, `lk-core`, `lk-generator`, `lk-totp`; not executed in a browser yet. `lk-store` (SQLite) is not used on the web (IndexedDB, ciphertext only) |
 | Android (arm64, armv7, x86_64) | ⬜ | Cross-compilation added with `lk-ffi` |
 | iOS (arm64, simulator) | ⬜ | Requires macOS runner with Xcode, added with `lk-ffi` |
-| Linux arm64 | ⬜ | Added with the server images (M3) |
+| Linux arm64 | ⬜ | Not built yet (server images and CI runner planned before v0.1) |
+
+## Synchronization server (`lk-server`)
+
+| Target | Status | Evidence |
+|--------|--------|----------|
+| Linux x86_64, Docker image (`infra/Dockerfile`, Debian trixie) with PostgreSQL 16 | ✅ | Server test suite against PostgreSQL 16 (local and CI `server-tests`); Compose smoke test (local and CI `compose-smoke`) |
+| Linux arm64 image | ⬜ | Not built yet |
+| PostgreSQL versions other than 16 | ⬜ | Not tested (the Compose stack pins 16) |
 
 ## Features by platform (target state)
 

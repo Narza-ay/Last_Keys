@@ -1,0 +1,6 @@
+# Test-only override: exposes the server on the loopback interface so the CLI
+# can reach it over plain HTTP (allowed only for 127.0.0.1).
+services:
+  server:
+    ports:
+      - "127.0.0.1:18080:8080"

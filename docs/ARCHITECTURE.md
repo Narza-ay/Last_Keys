@@ -51,11 +51,17 @@ crates/
   lk-generator/       ✅ password and passphrase generator
   lk-totp/            ✅ HOTP/TOTP and otpauth URIs
   lk-vault/           ✅ item schema, validation, password history
-  lk-store/           ✅ local encrypted SQLite store, offline change queue
+  lk-store/           ✅ local encrypted SQLite store, offline change queue, sync state
+  lk-auth/            ✅ OPAQUE registration and login, session tokens
+  lk-protocol/        ✅ API v1 data types shared by server and clients
+  lk-sync/            ✅ client sync engine and typed API client
 fuzz/                 ✅ libFuzzer targets (nightly)
 apps/
-  cli/                ✅ `lk` command-line client (local)
+  cli/                ✅ `lk` command-line client (local vault + synchronization)
+  server/             ✅ synchronization server (axum, PostgreSQL)
   …                   ⬜ other applications, each with a status README
+infra/                ✅ Docker image, Compose stack, setup/backup/restore scripts
+scripts/              ✅ CI helpers (advisory guard, Compose smoke test)
 docs/                 specification, architecture, security, ADRs, audit
 .github/workflows/    ✅ CI
 ```
@@ -69,18 +75,18 @@ docs/                 specification, architecture, security, ADRs, audit
 | `lk-vault` | M2 | Item schema v1 (logins, secure notes, payment cards, identities; TOTP, backup codes, custom fields, password history), validation, in-memory search. Passkeys and documents join in M9/M12 | ✅ |
 | `lk-generator` | M2 | Passwords, passphrases, exact entropy of generated secrets | ✅ |
 | `lk-totp` | M2 | HOTP/TOTP (RFC 4226/6238), `otpauth://` parsing and generation, clock-skew check | ✅ |
-| `lk-store` | M2 | Local encrypted store (SQLite), migrations, tombstones, offline change queue | ✅ |
+| `lk-store` | M2, M3 | Local encrypted store (SQLite), migrations, tombstones, offline change queue, sync cursors, server revisions and history | ✅ |
 | `lk-auth` | M3 | OPAQUE registration/login (RFC 9807), session tokens | ✅ |
 | `lk-protocol` | M3 | Versioned API data types shared by server and clients | ✅ |
-| `lk-sync` | M3 | Change log, conflict detection, merge, sync state machine | 📐 |
+| `lk-sync` | M3 | Typed API client, account registration and device enrollment, sync engine (pull/push, conflict copies, rollback detection, full resynchronization) | ✅ |
 | `lk-import` | M6 | NordPass (then Bitwarden, 1Password, CSV) | 📐 |
 | `lk-wasm` | M4/M5 | `wasm-bindgen` bindings for web app and extension | 📐 |
 | `lk-ffi` | Phase 6 | UniFFI bindings for Kotlin and Swift | 📐 |
 
 | Application | Milestone | Stack | Status |
 |-------------|-----------|-------|--------|
-| `apps/cli` | M2 | Rust (`lk` command) for end-to-end verification and power users | ✅ (local) |
-| `apps/server` | M3 | Rust (axum), PostgreSQL, REST (WebSocket later), Docker | 🚧 endpoints done; packaging next |
+| `apps/cli` | M2, M3 | Rust (`lk` command) for end-to-end verification and power users | ✅ |
+| `apps/server` | M3 | Rust (axum), PostgreSQL, REST (WebSocket later), Docker Compose | ✅ |
 | `apps/desktop` | M4 | Tauri 2 + TypeScript | 📐 |
 | `apps/extension` | M5 | TypeScript, MV3, `lk-wasm` | 📐 |
 | `apps/web` | Phase 6 | React + TypeScript + `lk-wasm` | 📐 |
@@ -141,12 +147,16 @@ key released by biometrics/PIN — yields the account key. No network needed.
    bundle (which proves the key belongs to the account) and verifies that the
    sender is certified and not revoked.
 
-### Synchronization (📐 M3)
-Encrypted items carry `(vault_id, item_id, format_version)`; the sync layer
-adds a per-item revision and a client-generated change ID. Clients push and
-pull change batches; the server orders them per vault, enforces
-authorization and stores tombstones. Concurrent edits produce conflict
-copies, never silent overwrites. Details in a dedicated ADR at M3.
+### Synchronization (✅ M3)
+Encrypted items carry `(vault_id, item_id, format_version)`; the server adds
+a per-item revision and a per-account sequence number, and records every
+client-generated change ID (idempotent pushes). Clients pull states after
+their cursor, then push their latest local states with the revision they are
+based on; the server accepts or answers "conflict" with its current state.
+Clients merge: concurrent edits produce conflict copies, never silent
+overwrites; deletions are tombstones. Any sign that the server went back in
+time (restored backup or attack) stops synchronization until the user asks
+for a full resynchronization. Details: [ADR-0008](adr/0008-sync-protocol.md).
 
 ## 6. Platform adapters (📐)
 

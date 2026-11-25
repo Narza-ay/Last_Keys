@@ -451,6 +451,52 @@ async fn pagination_and_large_items() {
 }
 
 #[tokio::test]
+async fn oversized_requests_are_refused() {
+    let server = TestServer::default().await;
+    let client = new_client("ivan@example.com", "ivan master password");
+    let token = enrolled(&server, &client).await;
+    let vault = create_vault(&server, &client, &token).await;
+
+    // Authentication and account endpoints: 256 KiB.
+    let padding = "x".repeat(300 * 1024);
+    let (status, _) = server
+        .post(
+            "/v1/accounts/prelogin",
+            None,
+            &json!({ "email": padding.clone() }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+    let (status, _) = server
+        .post(
+            "/v1/devices",
+            Some(&token),
+            &json!({ "certificate": padding }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+
+    // Push: 32 MiB, refused before anything is stored. Two valid 13 MiB
+    // items (about 17.3 MiB each once base64-encoded) exceed it together.
+    let changes: Vec<Value> = (0..2)
+        .map(|_| {
+            let item = vault.create_item(&vec![b'x'; 13 * 1024 * 1024]).unwrap();
+            change(item.item_id, 0, Some(&item))
+        })
+        .collect();
+    let (status, _) = push(&server, &token, &vault.vault_id(), changes).await;
+    assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+    let (_, body) = server
+        .get(
+            &format!("/v1/vaults/{}/changes?since=0", vault.vault_id()),
+            Some(&token),
+        )
+        .await;
+    assert_eq!(body["items"].as_array().unwrap().len(), 0);
+    server.cleanup().await;
+}
+
+#[tokio::test]
 async fn password_change_and_recovery_reset() {
     let server = TestServer::default().await;
     let client = new_client("grace@example.com", "grace master password");

@@ -1,0 +1,79 @@
+# Last Keys self-hosted stack: PostgreSQL + server + Caddy (automatic TLS).
+# Usage: see docs/SELF_HOSTING.md (./setup.sh, then docker compose up -d).
+name: lastkeys
+
+services:
+  db:
+    image: postgres:16-trixie
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: lastkeys
+      POSTGRES_DB: lastkeys
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets: [db_password]
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lastkeys -d lastkeys"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    networks: [backend]
+
+  server:
+    image: ${LK_SERVER_IMAGE:-lastkeys/server:local}
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      LK_DATABASE_URL_FILE: /run/secrets/database_url
+      LK_SERVER_SECRET_FILE: /run/secrets/server_secret
+      # Caddy is the only client of the server; it sets X-Forwarded-For.
+      LK_TRUST_PROXY_HEADERS: "true"
+      LK_ALLOW_REGISTRATION: ${LK_ALLOW_REGISTRATION:-true}
+      LK_LOG_FORMAT: json
+    secrets: [database_url, server_secret]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [backend, frontend]
+
+  proxy:
+    image: caddy:2.11.9-alpine
+    restart: unless-stopped
+    depends_on:
+      server:
+        condition: service_healthy
+    environment:
+      LK_DOMAIN: ${LK_DOMAIN:?set LK_DOMAIN in infra/.env}
+    ports:
+      - "${LK_HTTP_PORT:-80}:80"
+      - "${LK_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [frontend]
+
+secrets:
+  db_password:
+    file: ./secrets/db_password
+  database_url:
+    file: ./secrets/database_url
+  server_secret:
+    file: ./secrets/server_secret
+
+volumes:
+  db-data: {}
+  caddy-data: {}
+  caddy-config: {}
+
+networks:
+  # The database is reachable only from the server.
+  backend:
+    internal: true
+  frontend: {}

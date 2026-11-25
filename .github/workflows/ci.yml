@@ -75,6 +75,21 @@ jobs:
       - name: End-to-end CLI synchronization (two devices, real binary)
         run: cargo test -p lk-cli --features server-e2e --test sync_e2e --locked
 
+  compose-smoke:
+    name: Self-hosting stack (Docker Compose smoke test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install pinned toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - name: Build the lk CLI
+        run: cargo build --release --locked -p lk-cli
+      - name: Build the server image from source
+        run: docker build -f infra/Dockerfile -t lastkeys/server:local .
+      - name: Setup, TLS health, register/sync, backup, wipe, restore, enroll
+        run: ./scripts/compose-smoke-test.sh
+
   wasm:
     name: WebAssembly build check
     runs-on: ubuntu-latest

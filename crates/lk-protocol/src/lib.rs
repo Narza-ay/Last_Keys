@@ -342,6 +342,14 @@ pub struct PullResponse {
     pub next_since: u64,
     /// Whether more states remain.
     pub more: bool,
+    /// Latest `seq` of the account when the pull was served (never lower
+    /// than the `seq` of a returned state). A client whose cursor is ahead of
+    /// it is talking to a server whose data went back in time.
+    pub head: u64,
+    /// Identifier of the server's history. It changes when the operator
+    /// restores a backup; clients then refuse to synchronize until the user
+    /// asks for a full resynchronization (ADR-0008, "Restore").
+    pub history: Uuid,
 }
 
 /// Identifier type re-exported for convenience.

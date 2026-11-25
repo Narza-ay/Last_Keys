@@ -5,17 +5,20 @@ Maintained continuously (spec §19). Each entry links to its analysis in
 "platform/design" limitations are permanent consequences of a platform or of
 the security model.
 
-## Current (M2)
+## Current (M3)
 
 | Limitation | Planned resolution |
 |------------|--------------------|
-| No graphical application yet. The server exists, but no client synchronizes with it yet (the `lk` CLI is local-only until the client sync engine lands). | M3 (client sync), M4–M6 |
-| Server: no e-mail verification at registration (registering reveals whether an e-mail is already taken), no WebSocket notifications, no account deletion, plain (non-TLS) connection to PostgreSQL (intended for the internal Docker network only). | M3 / before v0.1 |
+| No graphical application yet: the `lk` CLI is the only client (synchronization included). | M4–M6 |
+| Server: no e-mail verification at registration (registering reveals whether an e-mail is already taken), no WebSocket notifications (clients synchronize on demand), no account deletion, plain (non-TLS) connection to PostgreSQL (intended for the internal Docker network only). | Before v0.1 (notifications, account deletion), before the official cloud (e-mail verification) |
+| Self-hosting: `linux/amd64` image only, built locally (no published or signed image); upgrade from a previous release untested (there is none yet). | arm64 and published images before v0.1; upgrade test with the first release |
+| After a server restore, every device must run `lk sync --reset`; versions written after the backup come back as conflict copies and deletions made after the backup reappear (nothing is lost). | Finer resynchronization (ADR-0008, "Restore") |
+| Synchronization is verified by deterministic multi-device scenarios only; the randomized simulation (≥ 5 devices, ≥ 10 000 operations, V-Y3) is not written yet. | Before v0.1 |
+| Revoking a device does not rotate vault keys (a revoked device keeps the keys it held; the server refuses it). | M7 |
 | The `lk` CLI is English-only, notes are entered on a single line, and every command asks for the master password (no session caching). | Graphical apps (M4) provide FR/EN and sessions |
 | Store crash-safety relies on SQLite transactions; process-kill injection tests are not written yet (V-S2). | Before v0.1 |
-| Argon2id default parameters measured only on a server vCPU (≈ 147 ms); not yet on mobile or in WebAssembly. | KDF campaign, M2 (criterion V-C8) |
+| Argon2id default parameters measured only on a server vCPU (≈ 147 ms); not yet on mobile or in WebAssembly. | KDF campaign (V-C8): needs the physical devices and the WASM harness (M4/M5) |
 | WebAssembly build is compile-checked in CI but not executed in a browser. | M4/M5 (`lk-wasm` + browser tests) |
-| HPKE is tested for round-trip, tampering and binding, not yet against a second independent implementation. | M2 (criterion V-C3) |
 | Device-identity and private-key storage use a caller-supplied wrapping key; platform key-store adapters (hardware protection) do not exist yet. | Phase 5 / M7 |
 | Pairing verification between a new device and a trusted device (out-of-band code) is not designed yet. | Phase 5 / M7 |
 | Windows and macOS: the Rust core is tested by the CI matrix (GitHub-hosted runners) only, not on physical user machines. | Platform testing with the desktop app (M4) |

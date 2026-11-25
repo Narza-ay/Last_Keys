@@ -1,4 +1,5 @@
-//! Schema migration v1 → v2 (criterion V-S3) and synchronization state.
+//! Schema migration from v1 to the latest version (criterion V-S3) and
+//! synchronization state.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
@@ -99,6 +100,7 @@ fn version_1_store_is_migrated_without_data_loss() {
         b"kept across the migration"
     );
     assert_eq!(store.sync_cursor(&vault.vault_id()).unwrap(), 0);
+    assert!(store.sync_history(&vault.vault_id()).unwrap().is_none());
     assert!(store.remote().unwrap().is_none());
 }
 
@@ -235,15 +237,69 @@ fn pending_changes_are_resolved_atomically() {
         f.store.local_item(&item.item_id).unwrap().unwrap().item,
         Some(server)
     );
+}
 
-    f.store.reset_server_revision(&item.item_id).unwrap();
+#[test]
+fn server_history_is_remembered_per_vault() {
+    let mut f = fixture();
+    let v = f.vault.vault_id();
+    assert!(f.store.sync_history(&v).unwrap().is_none());
+    f.store.set_sync_history(&v, "history-1").unwrap();
+    f.store.set_sync_cursor(&v, 7).unwrap();
     assert_eq!(
+        f.store.sync_history(&v).unwrap().as_deref(),
+        Some("history-1"),
+        "advancing the cursor keeps the history"
+    );
+    assert_eq!(f.store.sync_cursor(&v).unwrap(), 7);
+}
+
+#[test]
+fn full_resync_requeues_live_items_and_forgets_server_state() {
+    let mut f = fixture();
+    let v = f.vault.vault_id();
+    // Two synchronized items (one later deleted remotely) and nothing pending.
+    let kept = f.vault.create_item(b"kept").unwrap();
+    let gone = f.vault.create_item(b"deleted").unwrap();
+    for (item, revision) in [(&kept, 4), (&gone, 2)] {
+        let state = RemoteState {
+            item_id: item.item_id,
+            revision,
+            item: Some(item.clone()),
+        };
+        f.store.apply_remote(&v, &state, None, NOW).unwrap();
+    }
+    let tomb = RemoteState {
+        item_id: gone.item_id,
+        revision: 3,
+        item: None,
+    };
+    f.store.apply_remote(&v, &tomb, None, NOW).unwrap();
+    f.store.set_sync_cursor(&v, 9).unwrap();
+    f.store.set_sync_history(&v, "old history").unwrap();
+    assert!(f.store.pending_changes().unwrap().is_empty());
+
+    assert_eq!(f.store.reset_sync(&v, NOW).unwrap(), 1);
+    assert_eq!(f.store.sync_cursor(&v).unwrap(), 0);
+    assert!(f.store.sync_history(&v).unwrap().is_none());
+    for id in [kept.item_id, gone.item_id] {
+        assert_eq!(f.store.local_item(&id).unwrap().unwrap().server_revision, 0);
+    }
+    let pending = f.store.pending_changes().unwrap();
+    assert_eq!(pending.len(), 1, "only live items are queued");
+    assert_eq!(pending[0].item_id, kept.item_id);
+    // Local content is untouched.
+    assert_eq!(
+        f.store.local_item(&kept.item_id).unwrap().unwrap().item,
+        Some(kept)
+    );
+    assert!(
         f.store
-            .local_item(&item.item_id)
+            .local_item(&gone.item_id)
             .unwrap()
             .unwrap()
-            .server_revision,
-        0
+            .item
+            .is_none()
     );
 }
 

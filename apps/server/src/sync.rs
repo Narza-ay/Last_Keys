@@ -318,9 +318,24 @@ pub(crate) async fn pull(
         });
     }
     let next_since = items.last().map_or(query.since, |s| s.seq);
+    // Read after the items: every committed push visible above is also
+    // counted here, so `head` is never lower than a returned `seq`.
+    let meta = sqlx::query(
+        "SELECT (SELECT history_id FROM server_meta) AS history,
+                COALESCE((SELECT last_seq FROM account_seq WHERE account_id = $1), 0) AS head",
+    )
+    .bind(session.account_id.as_uuid())
+    .fetch_one(state.db())
+    .await?;
+    let history: Option<Uuid> = meta.try_get("history")?;
     Ok(Json(PullResponse {
         items,
         next_since,
         more,
+        head: to_u64(meta.try_get("head")?)?,
+        history: history.ok_or_else(|| {
+            tracing::error!("server_meta holds no history identifier");
+            ApiError::internal()
+        })?,
     }))
 }
