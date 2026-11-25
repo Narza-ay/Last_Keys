@@ -1,13 +1,52 @@
 # `lk` — command-line client
 
-**Status: not started — milestone M2 (next).** Nothing in this directory is functional yet.
+**Status: implemented (milestone M2), local only.** Synchronization arrives
+with the server in M3. English-only developer and power-user tool; the
+graphical applications provide the French/English interface.
 
-Purpose: exercise the complete local stack end to end before any graphical
-client exists (create account, unlock, add/list/show/edit items, generate
-passwords, TOTP codes, change password, show recovery procedure), and serve
-power users afterwards.
+`lk` exercises the complete local stack end to end: key hierarchy
+(`lk-core`), vault model (`lk-vault`), local encrypted store (`lk-store`),
+generator (`lk-generator`) and TOTP (`lk-totp`).
 
-Stack: Rust binary linking `lk-core`, `lk-vault`, `lk-store`,
-`lk-generator`, `lk-totp`. Secrets read from the terminal without echo; no
-secret ever accepted as a command-line argument (visible in process lists and
-shell history).
+## Build
+
+```bash
+cargo build --release -p lk-cli
+./target/release/lk --help
+```
+
+## Usage
+
+```bash
+lk init                                   # create account + vault, shows the recovery key once
+lk add login --title Bank --username alice --url bank.example.com --generate
+lk add login --title GitHub --totp        # prompts for password and TOTP secret/otpauth URI
+lk add note --title Wifi
+lk add card --title Visa --expiry 12/2030 # prompts for number and security code
+lk list [query]
+lk show <id> [--reveal]
+lk edit <id> --password | --generate | --restore-password N | --add-url URL | --title T
+lk history <id> [--reveal]
+lk totp <id>
+lk delete <id>
+lk generate [--length N --no-symbols ...] | --passphrase [--words N --separator S]
+lk passwd                                 # change the master password
+lk --recovery-key passwd                  # reset a forgotten master password with the recovery key
+lk recovery rotate                        # replace the recovery key
+lk info
+```
+
+`<id>` is the item ID or a prefix of at least 4 characters (as shown by
+`lk list`). The vault file defaults to `$LK_VAULT`, then
+`~/.lastkeys/vault.lkvault`; override with `--vault`.
+
+## Security rules
+
+* Secrets are never accepted as arguments (process lists, shell history).
+  They are read from hidden prompts, or one per line from standard input with
+  `--password-stdin` (for scripts and tests).
+* Secrets are masked in output unless `--reveal` is given; the recovery key
+  is printed only by `init` and `recovery rotate`.
+* Master passwords shorter than 12 characters are refused by this client.
+* Local protection is software-only until platform key stores (M7): the
+  vault is unlocked by the master password (Argon2id) every time.

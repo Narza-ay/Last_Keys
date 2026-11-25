@@ -7,6 +7,7 @@ members = [
   "crates/lk-totp",
   "crates/lk-vault",
   "crates/lk-store",
+  "apps/cli",
 ]
 # Fuzz targets need a nightly toolchain and live in their own workspace.
 exclude = ["fuzz"]
@@ -61,6 +62,10 @@ uuid = { version = "1.29.3", default-features = false, features = ["serde"] }
 # Local storage: SQLite compiled from the bundled amalgamation (same version
 # on every platform, no dependency on the system library).
 rusqlite = { version = "0.43.0", default-features = false, features = ["bundled"] }
+
+# Command-line client only
+clap = { version = "4.6.10", features = ["derive"] }
+rpassword = { version = "7.5.5" }
 
 # Test-only
 proptest = { version = "1.12.0", default-features = false, features = ["std"] }
