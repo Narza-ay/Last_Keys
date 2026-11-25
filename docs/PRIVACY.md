@@ -15,6 +15,14 @@ data flow changes. (Status: design; no server or telemetry exists yet.)
 | Device list (names, platforms, public keys, last sync) | Visible |
 | IP addresses, request times | Visible to the server and its logs; retention limited (to be defined, see below) |
 
+## What the local store contains (on each device)
+
+The local database (`lk-store`) holds only ciphertext produced by the core,
+plus, in clear: account, device, vault and item identifiers, item revisions,
+modification times, deletion markers and the queue of changes awaiting
+synchronization. Titles, URLs and every other item field are encrypted.
+Files are created readable by their owner only (Unix).
+
 ## Hosting
 
 Official cloud: European Union, preferably France (decision 4). Third-party

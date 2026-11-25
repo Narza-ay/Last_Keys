@@ -6,10 +6,10 @@ Last Keys is a premium, cross-platform password manager and digital identity
 vault with end-to-end encryption, independent device identities, offline use,
 cloud, self-hosted and peer-to-peer synchronization.
 
-> **Project status — milestone M1 (2026-11-25).** The cryptographic core and
-> the key hierarchy are implemented and tested. There is **no usable
-> application yet**: no UI, no server, no storage. See the
-> [roadmap](ROADMAP.md) for what comes next and
+> **Project status — milestone M2 (2026-11-25).** The cryptographic core,
+> the vault model, the local encrypted store and the `lk` command-line client
+> work end to end on one device. There is **no graphical application and no
+> server yet**. See the [roadmap](ROADMAP.md) for what comes next and
 > [known limitations](docs/KNOWN_LIMITATIONS.md) for what does not work.
 
 ## What exists today
@@ -18,8 +18,13 @@ cloud, self-hosted and peer-to-peer synchronization.
 |-----------|--------|
 | `crates/lk-crypto` — Argon2id, HKDF, XChaCha20-Poly1305 envelopes, HPKE, Ed25519, recovery key | ✅ implemented, tested, fuzzed |
 | `crates/lk-core` — account key hierarchy, password change, recovery-key rotation, vault/item keys, device identities, certificates, revocations, trusted-device transfer | ✅ implemented, tested |
+| `crates/lk-generator` — passwords and passphrases (OS CSPRNG, exact entropy) | ✅ implemented, tested |
+| `crates/lk-totp` — HOTP/TOTP (RFC 4226/6238), `otpauth://` URIs | ✅ implemented, tested |
+| `crates/lk-vault` — item schema v1 (logins, notes, cards, identities), validation, password history | ✅ implemented, tested, fuzzed |
+| `crates/lk-store` — local encrypted SQLite store with offline change queue | ✅ implemented, tested |
+| `apps/cli` — `lk` command-line client (local) | ✅ implemented, tested end to end |
 | CI: format, Clippy, tests on Linux/Windows/macOS, WebAssembly check, dependency policy, docs, nightly fuzzing | ✅ configured |
-| Applications (desktop, mobile, extension, web, server, CLI) | ⬜ not started — see [`apps/`](apps) |
+| Server, desktop, browser extension, mobile, web | ⬜ not started — see [`apps/`](apps) |
 
 ## Build and test
 
@@ -28,6 +33,7 @@ Requirements: Rust via `rustup` (the pinned toolchain in
 
 ```bash
 cargo test --workspace --locked
+cargo run --release -p lk-cli -- --help
 ```
 
 Full verification commands: [docs/TESTING.md](docs/TESTING.md).

@@ -1,6 +1,6 @@
 # Roadmap
 
-Updated after every milestone. Last update: **2026-11-25 — M1 completed.**
+Updated after every milestone. Last update: **2026-11-25 — M2 completed.**
 
 The specification defines 8 phases (spec §18). At the owner's request the
 product is delivered **MVP-first**: milestones cut a vertical slice through
@@ -27,7 +27,7 @@ monitoring, P2P sync, documents/attachments, web application, telemetry.
 |---|-----------|-------------|--------|
 | M0 | Audit, architecture, documentation, monorepo, CI | 1 | ✅ Done |
 | M1 | Cryptographic core: KDF, envelopes, HPKE, signatures, recovery key, key hierarchy, device identities, certificates, revocation, trusted-device transfer | 2 | ✅ Done |
-| M2 | Vault model (logins, notes, cards, identities, TOTP), password/passphrase generator, local encrypted store (SQLite) with offline queue, `lk` CLI for end-to-end verification, HPKE cross-implementation vector, KDF benchmark campaign | 2, 4 | 🚧 In progress |
+| M2 | Vault model (logins, notes, cards, identities, TOTP), password/passphrase generator, local encrypted store (SQLite) with offline queue, `lk` CLI for end-to-end verification, HPKE cross-implementation vector | 2, 4 | ✅ Done (KDF device campaign carried over: needs physical devices) |
 | M3 | Server: OPAQUE authentication, device registry, encrypted sync with change log and conflict handling, revocation enforcement, PostgreSQL, Docker Compose self-hosting, backup/restore | 3 | ⬜ |
 | M4 | Desktop app (Tauri 2): unlock, vault browsing/editing, generator, TOTP, devices, settings, FR/EN, light/dark/system | 6 | ⬜ |
 | M5 | Browser extension (Chrome, Brave, Firefox): login-form detection, safe domain matching, fill, save, generate | 6 | ⬜ |
@@ -58,3 +58,21 @@ platform claims marked **[verify]** in the audit are unconfirmed.
 
 CI run 1 (commit `dc25306`): all 7 jobs green, including the 90 tests on
 Windows and macOS. MVP scope confirmed by the owner; M2 started.
+
+### M2 — 2026-11-25
+Delivered: `lk-generator` (passwords, passphrases, exact entropy),
+`lk-totp` (RFC 4226/6238, otpauth URIs), `lk-vault` (item schema v1 with
+validation and password history), `lk-store` (SQLite local store with
+offline change queue), `lk` CLI (end-to-end local stack), HPKE
+interoperability with an independent implementation (V-C3), canary test
+proving no plaintext on disk (V-S1), χ² generator test (V-S5). 162 tests.
+
+Carried over: KDF benchmark on the minimum supported Android/iOS devices and
+in browsers (V-C8) — requires hardware and the WASM harness of M4/M5.
+Remaining risks: OPAQUE not yet prototyped; crash-injection tests of the
+store (V-S2) partial (rollback tested, power-loss simulation pending).
+
+### Next (M3) — entry criteria
+Owner approval of OPAQUE for server authentication (AUDIT decision 5,
+ADR-0005) and of the backup destination policy (decision 3). Server
+framework and database driver chosen by ADR at the start of M3.

@@ -8,14 +8,14 @@ Legend: ✅ tested · 🧪 tested in CI only · 🔧 compile-checked only · ⬜
 Windows 11+, macOS 14+, Android 10+ (API 29), iOS 17+, maintained Linux
 distributions (glibc-based x86_64 and arm64 first).
 
-## Rust core (`lk-crypto`, `lk-core`)
+## Rust core (`lk-crypto`, `lk-core`, `lk-generator`, `lk-totp`, `lk-vault`, `lk-store`) and `lk` CLI
 
 | Target | Status | Evidence |
 |--------|--------|----------|
 | Linux x86_64 | ✅ | Local test suite + CI (`ubuntu-latest`) |
 | Windows x86_64 | 🧪 | CI (`windows-latest`): all tests pass, dev and release profiles (first verified in run 45630834635, commit `dc25306`) |
 | macOS arm64 | 🧪 | CI (`macos-latest`): all tests pass, dev and release profiles (first verified in run 45630834635, commit `dc25306`) |
-| WebAssembly (`wasm32-unknown-unknown`) | 🔧 | CI `cargo check`; not executed in a browser yet |
+| WebAssembly (`wasm32-unknown-unknown`) | 🔧 | CI `cargo check` of `lk-crypto`, `lk-core`, `lk-generator`, `lk-totp`; not executed in a browser yet. `lk-store` (SQLite) is not used on the web (IndexedDB, ciphertext only) |
 | Android (arm64, armv7, x86_64) | ⬜ | Cross-compilation added with `lk-ffi` |
 | iOS (arm64, simulator) | ⬜ | Requires macOS runner with Xcode, added with `lk-ffi` |
 | Linux arm64 | ⬜ | Added with the server images (M3) |

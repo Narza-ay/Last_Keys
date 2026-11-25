@@ -5,11 +5,13 @@ Maintained continuously (spec §19). Each entry links to its analysis in
 "platform/design" limitations are permanent consequences of a platform or of
 the security model.
 
-## Current (M1)
+## Current (M2)
 
 | Limitation | Planned resolution |
 |------------|--------------------|
-| No application, server, storage or UI yet: the product cannot be used by end users. Only the cryptographic core exists. | M2–M6 (MVP) |
+| No graphical application and no server yet: only the `lk` command-line client works, locally, on one device. | M3–M6 (MVP) |
+| The `lk` CLI is English-only, notes are entered on a single line, and every command asks for the master password (no session caching). | Graphical apps (M4) provide FR/EN and sessions |
+| Store crash-safety relies on SQLite transactions; process-kill injection tests are not written yet (V-S2). | Before v0.1 |
 | Argon2id default parameters measured only on a server vCPU (≈ 147 ms); not yet on mobile or in WebAssembly. | KDF campaign, M2 (criterion V-C8) |
 | WebAssembly build is compile-checked in CI but not executed in a browser. | M4/M5 (`lk-wasm` + browser tests) |
 | HPKE is tested for round-trip, tampering and binding, not yet against a second independent implementation. | M2 (criterion V-C3) |

@@ -48,8 +48,14 @@ deny.toml             Dependency policy (licenses, advisories, sources)
 crates/
   lk-crypto/          ✅ primitives: KDF, envelope, HPKE, signatures, recovery key
   lk-core/            ✅ key hierarchy, vault/item keys, device identities
+  lk-generator/       ✅ password and passphrase generator
+  lk-totp/            ✅ HOTP/TOTP and otpauth URIs
+  lk-vault/           ✅ item schema, validation, password history
+  lk-store/           ✅ local encrypted SQLite store, offline change queue
 fuzz/                 ✅ libFuzzer targets (nightly)
-apps/                 ⬜ one directory per application, each with a status README
+apps/
+  cli/                ✅ `lk` command-line client (local)
+  …                   ⬜ other applications, each with a status README
 docs/                 specification, architecture, security, ADRs, audit
 .github/workflows/    ✅ CI
 ```
@@ -60,10 +66,10 @@ docs/                 specification, architecture, security, ADRs, audit
 |-------|-----------|----------------|--------|
 | `lk-crypto` | M1 | Argon2id, HKDF labels, XChaCha20-Poly1305 envelope, HPKE, Ed25519, recovery key, OS RNG | ✅ |
 | `lk-core` | M1 | Account key bundle, password change, recovery-key rotation, vault keys, item encryption, device identity, certificates, revocations, account-key transfer | ✅ |
-| `lk-vault` | M2 | Item schema (logins, notes, cards, identities, documents, TOTP, passkeys), history, in-memory search | 🔜 |
-| `lk-generator` | M2 | Passwords, passphrases, strength estimation | 🔜 |
-| `lk-totp` | M2 | RFC 6238 TOTP, `otpauth://` parsing | 🔜 |
-| `lk-store` | M2 | Local encrypted store (SQLite), migrations, offline change queue | 🔜 |
+| `lk-vault` | M2 | Item schema v1 (logins, secure notes, payment cards, identities; TOTP, backup codes, custom fields, password history), validation, in-memory search. Passkeys and documents join in M9/M12 | ✅ |
+| `lk-generator` | M2 | Passwords, passphrases, exact entropy of generated secrets | ✅ |
+| `lk-totp` | M2 | HOTP/TOTP (RFC 4226/6238), `otpauth://` parsing and generation, clock-skew check | ✅ |
+| `lk-store` | M2 | Local encrypted store (SQLite), migrations, tombstones, offline change queue | ✅ |
 | `lk-protocol` | M3 | Versioned API data types shared by server and clients | 📐 |
 | `lk-sync` | M3 | Change log, conflict detection, merge, sync state machine | 📐 |
 | `lk-import` | M6 | NordPass (then Bitwarden, 1Password, CSV) | 📐 |
@@ -72,7 +78,7 @@ docs/                 specification, architecture, security, ADRs, audit
 
 | Application | Milestone | Stack | Status |
 |-------------|-----------|-------|--------|
-| `apps/cli` | M2 | Rust (`lk` command) for end-to-end verification and power users | 🔜 |
+| `apps/cli` | M2 | Rust (`lk` command) for end-to-end verification and power users | ✅ (local) |
 | `apps/server` | M3 | Rust, PostgreSQL, REST + WebSocket, Docker | 📐 |
 | `apps/desktop` | M4 | Tauri 2 + TypeScript | 📐 |
 | `apps/extension` | M5 | TypeScript, MV3, `lk-wasm` | 📐 |

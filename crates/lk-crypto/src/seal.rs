@@ -422,6 +422,42 @@ mod tests {
         );
     }
 
+    /// Cross-implementation vector (criterion V-C3): the sealed message was
+    /// produced by pyhpke 0.6.5 (backed by pyca/cryptography, i.e. OpenSSL),
+    /// independent from rust-hpke, using our suite, `info` and `aad`
+    /// conventions, to the key pair RFC 9180 `DeriveKeyPair` gives for the IKM
+    /// 00 01 .. 1f. Both implementations must also agree on that public key.
+    #[test]
+    fn opens_message_sealed_by_independent_implementation() {
+        let hex = |s: &str| data_encoding::HEXLOWER.decode(s.as_bytes()).unwrap();
+        let ikm: [u8; 32] = core::array::from_fn(|i| u8::try_from(i).unwrap());
+        let (secret, public) = Kem::derive_keypair(&ikm);
+        let kp = EncryptionKeyPair {
+            secret,
+            public: PublicEncryptionKey(public),
+        };
+        assert_eq!(
+            data_encoding::HEXLOWER.encode(&kp.public_key().to_bytes()),
+            "b1f1b840de7a3241b02748cf9b05b74dc8c5e8451298738817bd76aa8ebe8c2b"
+        );
+        let sealed = SealedMessage::from_bytes(&hex(
+            "01019f93f2544684523191cda46edd935bb351b307221575d14eaeed41aaa559\
+             894c5591864f0f5eae8311725c5fe1410b03e4b895cdff3a90fbb9be8b195b53\
+             05a24d46bc6fc1efdb677771c9f95b9ed2447e1b65f2a837af28d0e5605ad3d6\
+             5a9e",
+        ))
+        .unwrap();
+        let key = kp
+            .open_key(
+                &sealed,
+                b"account-key-transfer",
+                b"lastkeys/v1/test/cross-implementation",
+            )
+            .unwrap();
+        assert_eq!(key.id().as_bytes(), &[0x11; 16]);
+        assert_eq!(key.expose(), &[0x22; 32]);
+    }
+
     #[test]
     fn oversized_plaintext_rejected() {
         let kp = EncryptionKeyPair::generate().unwrap();

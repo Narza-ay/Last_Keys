@@ -6,6 +6,28 @@ semantic versioning once releases begin.
 
 ## [Unreleased]
 
+### Added — M2: local vault (2026-11-25)
+- `lk-generator`: password generator (classes, minimums, exclusions,
+  uniform draws, Fisher–Yates shuffle) and EFF-wordlist passphrases, with
+  exact entropy; χ² uniformity test.
+- `lk-totp`: HOTP/TOTP (SHA1/256/512, 6–8 digits), `otpauth://` parsing and
+  generation, clock-skew assessment; RFC 4226/6238 vectors.
+- `lk-vault`: item schema v1 (logins with URLs/TOTP/backup codes, secure
+  notes, payment cards, identities with documents; folders, tags, notes,
+  custom fields), validation, bounded password history with restore/delete,
+  metadata-only search, fully redacted `Debug`; JSON codec with schema probe.
+- `lk-store`: SQLite local store (WAL, `synchronous=FULL`, foreign keys,
+  `secure_delete`, owner-only files), transactional writes, tombstones,
+  offline change queue, forward-only migrations; canary test proving no
+  plaintext reaches the disk.
+- `lk` CLI: init, info, add/list/show/edit/delete, history, totp, generate,
+  passwd (including recovery-key reset), recovery rotate; secrets never
+  accepted as arguments.
+- `lk-core`: device identity sealed under the account key; `ChangeId`.
+- HPKE cross-implementation vector with pyhpke/OpenSSL; `item_decode` fuzz
+  target; `NOTICE` (EFF wordlist attribution).
+- CI: `actions/checkout@v5`; WebAssembly check covers the new portable crates.
+
 ### Added — M0: foundation (2026-11-25)
 - Rust workspace (edition 2024) with pinned toolchain 1.97.0, centrally pinned
   dependencies, committed lock file and strict lints (`unsafe` forbidden, no

@@ -117,9 +117,9 @@ marked ✅ are already met (with the evidence named); the others are targets.
 |----|-----------|--------|
 | V-C1 | Only primitives from the reviewed dependency set; no custom primitive; `unsafe` forbidden in workspace crates. | ✅ `#![forbid(unsafe_code)]`, `cargo deny check`, [ADR-0003](adr/0003-dependency-policy.md) |
 | V-C2 | Known-answer tests: HKDF (RFC 5869 A.3), Ed25519 (RFC 8032 §7.1 test 1), Argon2id against the reference C implementation, recovery-key format vectors computed independently. | ✅ unit tests in `lk-crypto` |
-| V-C3 | HPKE interoperability with a second independent implementation (RFC 9180 test vectors run upstream; add our own cross-implementation vector). | ⬜ M2 |
+| V-C3 | HPKE interoperability with a second independent implementation (RFC 9180 test vectors run upstream; add our own cross-implementation vector). | ✅ pyhpke/OpenSSL in both directions (regression test + one-off reverse check), M2 |
 | V-C4 | Every single-bit flip and every truncation of an envelope is rejected; parsers never panic. | ✅ exhaustive unit tests + property tests (512 cases each) |
-| V-C5 | Coverage-guided fuzzing of every parser (envelope, sealed message, recovery key, later sync/import parsers): ≥ 1 h per target with no crash before each release; continuous in CI. | ⬜ (targets added; see [TESTING.md](TESTING.md)) |
+| V-C5 | Coverage-guided fuzzing of every parser (envelope, sealed message, recovery key, later sync/import parsers): ≥ 1 h per target with no crash before each release; continuous in CI. | ⬜ 5 targets, short runs clean, nightly CI workflow; 1 h campaign before release (see [TESTING.md](TESTING.md)) |
 | V-C6 | Ciphertexts are bound to their location: swapping, moving or relabeling items, vault keys or private keys is detected. | ✅ `lk-core/tests/flows.rs` |
 | V-C7 | Hostile parameters are refused: KDF below the floor (64 MiB, t ≥ 2), substituted public keys, forged device certificates or revocations, transfers to uncertified or revoked devices. | ✅ unit + integration tests |
 | V-C8 | KDF cost: Argon2id unlock p50 ≤ 1 s on the reference low-end Android 10 device and ≤ 2 s in WebAssembly on a mid-range laptop, with memory ≥ 64 MiB. Default parameters fixed from these measurements. | ⬜ server CPU measured (147 ms); device and WASM campaign pending |
@@ -128,13 +128,13 @@ marked ✅ are already met (with the evidence named); the others are targets.
 
 ### 3.2 Local vault and storage (Phase 2/4)
 
-| ID | Criterion |
-|----|-----------|
-| V-S1 | No plaintext vault data on disk: canary test (unique strings written to the vault never appear in database files, WAL, temporary files or logs). |
-| V-S2 | Crash-safety: killing the process at any point of a write never corrupts the store (transactional writes, recovery test). |
-| V-S3 | Schema migrations are forward-only, tested from every released version. |
-| V-S4 | Importers write no plaintext temporary files; malformed input never panics (fuzzed). |
-| V-S5 | Password generator: uniform symbol distribution (χ² test over 10⁶ draws), policy constraints always satisfied; TOTP passes RFC 6238 vectors. |
+| ID | Criterion | Status |
+|----|-----------|--------|
+| V-S1 | No plaintext vault data on disk: canary test (unique strings written to the vault never appear in database files, WAL, temporary files or logs). | ✅ `lk-store` canary test (database + WAL, open and closed) |
+| V-S2 | Crash-safety: killing the process at any point of a write never corrupts the store (transactional writes, recovery test). | ⬜ partial: every mutation is one transaction, rollback tested; process-kill injection pending |
+| V-S3 | Schema migrations are forward-only, tested from every released version. | ⬜ partial: forward-only runner and newer-version guard tested; no release yet |
+| V-S4 | Importers write no plaintext temporary files; malformed input never panics (fuzzed). | ⬜ M6 |
+| V-S5 | Password generator: uniform symbol distribution (χ² test over 10⁶ draws), policy constraints always satisfied; TOTP passes RFC 6238 vectors. | ✅ `lk-generator` statistics, `lk-totp` vectors |
 
 ### 3.3 Server and synchronization (Phase 3)
 

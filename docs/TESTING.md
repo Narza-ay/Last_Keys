@@ -7,7 +7,7 @@ cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked              # dev profile (dependencies optimized)
 cargo test --workspace --locked --release    # production profile (panic = abort)
-cargo check -p lk-core -p lk-crypto --target wasm32-unknown-unknown --locked
+cargo check -p lk-core -p lk-crypto -p lk-generator -p lk-totp --target wasm32-unknown-unknown --locked
 cargo deny check
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked --document-private-items
 ```
@@ -19,7 +19,7 @@ cd fuzz
 cargo +nightly fuzz run envelope_parse -- -max_total_time=300 -use_value_profile=1
 ```
 
-Targets: `envelope_parse`, `sealed_parse`, `recovery_parse`, `bundle_json`.
+Targets: `envelope_parse`, `sealed_parse`, `recovery_parse`, `bundle_json`, `item_decode`.
 
 KDF benchmark (always in release mode, on the device being measured):
 
@@ -27,15 +27,20 @@ KDF benchmark (always in release mode, on the device being measured):
 cargo run --release -p lk-crypto --example kdf_bench
 ```
 
-## Test inventory (M1)
+## Test inventory (M2)
 
-| Suite | Location | Count | What it covers |
-|-------|----------|-------|----------------|
-| `lk-crypto` unit | `crates/lk-crypto/src/**` | 55 | RNG, secret redaction, HKDF (RFC 5869 vector), Argon2id (bounds, NFC, reference-implementation vector), envelope (layout, every bit flip, every truncation, strict parsing, purpose/key/context binding), Ed25519 (RFC 8032 vector, domain separation), HPKE (round trip, binding, tampering, strict parsing), recovery key (format vectors, lenient input, typo detection) |
-| `lk-crypto` properties | `crates/lk-crypto/tests/properties.rs` | 10 (9 × 512 cases + 1 × 256 iterations) | Parsers never panic; envelope and HPKE round trips for arbitrary inputs; any single-byte modification rejected; context binding |
-| `lk-core` unit | `crates/lk-core/src/**` | 15 | Account creation/unlock, wrong credentials, hostile KDF parameters, substituted public keys, swapped private keys, format versions, JSON round trips, identifiers, canonical encoding |
-| `lk-core` integration | `crates/lk-core/tests/flows.rs` | 10 | Complete lifecycle (account → vault → items → second device by trusted transfer → revocation → password change → recovery-key rotation), item swap/move/relabel/alteration detection, vault-key account binding, forged/tampered device certificates and revocations, transfer binding to sender/recipient, refusal toward revoked or uncertified devices, cross-account key confusion |
-| Fuzz | `fuzz/fuzz_targets/` | 4 targets | Parsers never panic; accepted envelopes and sealed messages are canonical; recovery keys re-parse identically |
+| Crate | Suites | Tests | What it covers |
+|-------|--------|-------|----------------|
+| `lk-crypto` | unit (56), properties (10) | 66 | RNG; secret redaction; HKDF (RFC 5869 vector); Argon2id (bounds, NFC, reference-implementation vector); envelope (layout, every bit flip, every truncation, strict parsing, purpose/key/context binding); Ed25519 (RFC 8032 vector, domain separation); HPKE (round trip, binding, tampering, strict parsing, **cross-implementation vector**); recovery key (format vectors, lenient input, typos); parsers never panic (512 cases each) |
+| `lk-core` | unit (15), flows (11) | 26 | Account creation/unlock, wrong credentials, hostile KDF parameters, substituted public keys, swapped private keys, versions, JSON round trips; complete lifecycle; item swap/move/relabel detection; vault-key account binding; forged/tampered certificates and revocations; transfer binding, refusal toward revoked or uncertified devices; device identity sealed under the account key |
+| `lk-generator` | unit (13), statistics (2) | 15 | Policy constraints and errors, exact entropy, passphrase shape; **χ² uniformity over 10⁶ characters**; wordlist SHA-256 integrity |
+| `lk-totp` | vectors (13), properties (3) | 16 | **RFC 4226 and RFC 6238 vectors** (SHA1/256/512, recomputed with Python `hmac`); otpauth parsing, round trip, reserved characters, rejections; clock skew; parsers never panic (1024 cases each) |
+| `lk-vault` | unit (11), codec (7), properties (3) | 21 | URL/TOTP normalization, Luhn, field validation, bounded password history with restore/delete, search excludes secrets, fully redacted `Debug`; encrypted round trips; newer schema reported, unknown fields rejected, decoded items validated, size limits; decoder never panics |
+| `lk-store` | store (11) | 11 | Create/open/refuse overwrite, reopen + unlock + decrypt, revisions/tombstones/change queue, rollback on failure, vault and account mismatch, password-change persistence, newer schema refused, tampered rows detected, owner-only files, **V-S1 canary test (no plaintext in database or WAL)** |
+| `lk-cli` | unit (1), end to end (6) | 7 | Real binary: full workflow (add/list/search/show/reveal/TOTP/edit/history/restore/delete/info), wrong password, recovery-key password reset and rotation, init guards, secrets refused as arguments, generator, item references |
+| Fuzz | `fuzz/fuzz_targets/` | 5 targets | Parsers never panic; accepted envelopes and sealed messages are canonical; recovery keys and items re-encode identically |
+
+**Total: 162 tests.**
 
 ## Results — 2026-11-25 (Linux x86_64, toolchain 1.97.0)
 
@@ -43,13 +48,13 @@ cargo run --release -p lk-crypto --example kdf_bench
 |-------|--------|
 | `cargo fmt --check` | pass |
 | `cargo clippy -D warnings` (all targets) | pass |
-| `cargo test` (dev) | 90 passed, 0 failed |
-| `cargo test --release` | 90 passed, 0 failed |
-| `cargo check` wasm32-unknown-unknown | pass (compile only) |
+| `cargo test` (dev and release) | 162 passed, 0 failed |
+| `cargo check` wasm32-unknown-unknown (`lk-crypto`, `lk-core`, `lk-generator`, `lk-totp`) | pass (compile only) |
 | `cargo deny check` | advisories ok, bans ok, licenses ok, sources ok (one warning: duplicate `syn` versions, build-time only) |
 | `cargo doc -D warnings` | pass |
-| Fuzzing, 60 s per target | no crash: `envelope_parse` 6.28 M runs, `sealed_parse` 5.98 M, `recovery_parse` 2.49 M, `bundle_json` 1.28 M |
-| Windows, macOS | CI run 45630834635 (commit `dc25306`): all 7 jobs green; 90/90 tests pass on `windows-latest` and `macos-latest` (dev and release) |
+| Fuzzing | no crash: `envelope_parse` 6.28 M runs (60 s), `sealed_parse` 5.98 M (60 s), `recovery_parse` 2.49 M (60 s), `bundle_json` 1.28 M (60 s), `item_decode` 0.99 M (45 s) |
+| HPKE interoperability (V-C3) | pyhpke 0.6.5 (pyca/cryptography, OpenSSL) → `lk-crypto`: regression test; `lk-crypto` → pyhpke: verified once with a throw-away program (message opened by Python) |
+| Windows, macOS | CI run 45630834635 (commit `dc25306`, M1): all jobs green, 90/90 tests on `windows-latest` and `macos-latest`. M2 commits: see the CI run of each commit. |
 
 ## KDF benchmark campaign (criterion V-C8)
 
@@ -60,9 +65,9 @@ WebAssembly on a mid-range laptop, with memory ≥ 64 MiB.
 | Device | 64 MiB t=2 p=1 | 64 MiB t=3 p=1 | 64 MiB t=3 p=4 | 128 MiB t=3 p=4 | 256 MiB t=3 p=4 |
 |--------|---------------|---------------|---------------|----------------|----------------|
 | Server vCPU, Intel Xeon 2.1 GHz (dev container), native | 126 ms | 145 ms | 147 ms | 311 ms | 728 ms |
-| Reference low-end Android 10 device | pending | | | | |
-| iPhone (iOS 17 minimum device) | pending | | | | |
-| Mid-range laptop, WASM in Chrome/Firefox | pending | | | | |
+| Reference low-end Android 10 device | pending (needs the device) | | | | |
+| iPhone (iOS 17 minimum device) | pending (needs the device) | | | | |
+| Mid-range laptop, WASM in Chrome/Firefox | pending (browser harness, M4/M5) | | | | |
 
 Medians of 5 runs. The `argon2` crate computes lanes sequentially (the
 `parallel` feature is not enabled), so `p` changes the memory layout but not

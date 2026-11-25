@@ -146,7 +146,19 @@ displays as `LK1-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000-000
 * Account-key transfers are bound to sender, recipient and account, and are
   refused toward uncertified or revoked devices.
 
-## 10. Not yet specified
+## 10. Item plaintext (schema 1)
+
+The plaintext encrypted in an item's content envelope is the UTF-8 JSON
+encoding of `lk_vault::ItemData` (maximum 1 MiB), with a top-level
+`"schema": 1`. Readers first parse only `schema`; a value other than 1 is
+reported as "unsupported, update required". Unknown fields are rejected so
+that an older client never rewrites a newer item without fields it does not
+know. TOTP configurations are stored normalized as `otpauth://totp/` URIs.
+
+HMAC-SHA1 is used **only** for HOTP/TOTP codes (`lk-totp`), as RFC 4226/6238
+and the services issuing the secrets require; it protects nothing else.
+
+## 11. Not yet specified
 
 Server authentication (OPAQUE, [ADR-0005](adr/0005-server-authentication-opaque.md)),
 device-local unlock, sync log authentication, sharing, temporary links,
