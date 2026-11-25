@@ -1,0 +1,19 @@
+[package]
+name = "lk-protocol"
+description = "Last Keys client/server API types (version 1)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+lk-core.workspace = true
+serde.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+serde_json = { workspace = true, features = ["std"] }
+
+[lints]
+workspace = true

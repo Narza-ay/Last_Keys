@@ -8,7 +8,9 @@ members = [
   "crates/lk-vault",
   "crates/lk-store",
   "crates/lk-auth",
+  "crates/lk-protocol",
   "apps/cli",
+  "apps/server",
 ]
 # Fuzz targets need a nightly toolchain and live in their own workspace.
 exclude = ["fuzz"]
@@ -33,6 +35,7 @@ lk-totp = { path = "crates/lk-totp" }
 lk-vault = { path = "crates/lk-vault" }
 lk-store = { path = "crates/lk-store" }
 lk-auth = { path = "crates/lk-auth" }
+lk-protocol = { path = "crates/lk-protocol" }
 
 # Cryptography (RustCrypto / dalek / rust-hpke). No custom primitives.
 argon2 = { version = "0.6.0", default-features = false, features = ["alloc", "zeroize"] }
@@ -70,6 +73,15 @@ uuid = { version = "1.29.3", default-features = false, features = ["serde"] }
 # Local storage: SQLite compiled from the bundled amalgamation (same version
 # on every platform, no dependency on the system library).
 rusqlite = { version = "0.43.0", default-features = false, features = ["bundled"] }
+
+# Server only (ADR-0009)
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "net", "signal", "time"] }
+axum = { version = "0.8.9" }
+tower = { version = "0.5.3", features = ["util"] }
+tower-http = { version = "0.7.1", features = ["trace", "timeout"] }
+sqlx = { version = "0.9.1", default-features = false, features = ["runtime-tokio", "postgres", "migrate", "macros", "uuid", "json"] }
+tracing = { version = "0.1.44" }
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "fmt", "json"] }
 
 # Command-line client only
 clap = { version = "4.6.10", features = ["derive"] }

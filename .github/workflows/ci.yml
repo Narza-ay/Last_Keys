@@ -42,9 +42,36 @@ jobs:
       - name: Install pinned toolchain (rust-toolchain.toml)
         run: rustup toolchain install
       - uses: Swatinem/rust-cache@v2
-      - run: cargo test --workspace --locked
+      # The server's integration tests need PostgreSQL: they run in the
+      # `server-tests` job below, never skipped.
+      - run: cargo test --workspace --locked --exclude lk-server
       - name: Release-mode tests (production optimizations, panic=abort)
-        run: cargo test --workspace --locked --release
+        run: cargo test --workspace --locked --release --exclude lk-server
+
+  server-tests:
+    name: Server integration tests (PostgreSQL 16)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: lastkeys
+          POSTGRES_PASSWORD: lastkeys-ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U lastkeys"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      LK_TEST_DATABASE_URL: postgres://lastkeys:lastkeys-ci@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install pinned toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test -p lk-server --locked
 
   wasm:
     name: WebAssembly build check

@@ -1,0 +1,37 @@
+[package]
+name = "lk-server"
+description = "Last Keys synchronization server (cloud and self-hosted)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "lk-server"
+path = "src/main.rs"
+
+[dependencies]
+lk-auth.workspace = true
+lk-core.workspace = true
+lk-crypto.workspace = true
+lk-protocol.workspace = true
+axum.workspace = true
+tokio.workspace = true
+tower-http.workspace = true
+sqlx.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+serde.workspace = true
+serde_json = { workspace = true, features = ["std"] }
+uuid.workspace = true
+hkdf.workspace = true
+sha2.workspace = true
+data-encoding.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tower.workspace = true
+
+[lints]
+workspace = true
