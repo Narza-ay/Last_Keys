@@ -1,0 +1,24 @@
+[package]
+name = "lk-auth"
+description = "Last Keys server authentication: OPAQUE (RFC 9807) registration and login, session tokens."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+lk-crypto.workspace = true
+opaque-ke.workspace = true
+sha2-legacy.workspace = true
+rand-core-legacy.workspace = true
+hkdf.workspace = true
+sha2.workspace = true
+data-encoding.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true

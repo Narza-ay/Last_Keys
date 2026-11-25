@@ -13,6 +13,7 @@ continuous integration in place and the deployment process to come.
 | `test` | `cargo test --workspace --locked` on Linux, Windows and macOS |
 | `wasm` | `cargo check` of `lk-core` for `wasm32-unknown-unknown` |
 | `deny` | `cargo deny check` (advisories, licenses, bans, sources) |
+| `advisory-guard` | Proves the code behind the one ignored advisory (RUSTSEC-2026-0387) is not linked |
 | `docs` | `cargo doc` with warnings denied |
 
 `.github/workflows/fuzz.yml` runs every fuzz target nightly (and on demand).

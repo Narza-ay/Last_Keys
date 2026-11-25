@@ -21,7 +21,15 @@ targets = [
 version = 2
 # Any RustSec advisory (vulnerability, unmaintained, unsound) fails the build.
 yanked = "deny"
-ignore = []
+# Every exception needs a justification that CI keeps verifying.
+ignore = [
+  # crypto-bigint 0.5 (via opaque-ke 4 -> elliptic-curve 0.13): timing
+  # variability in bigint arithmetic. Our OPAQUE suite is Ristretto255
+  # (curve25519-dalek); the affected code is not linked at all, which
+  # scripts/check-advisory-unlinked.sh verifies in CI (job "advisory-guard").
+  # Remove when moving to opaque-ke 5 (crypto-bigint 0.7). See ADR-0005.
+  { id = "RUSTSEC-2026-0387", reason = "affected crypto-bigint code is not linked (verified in CI by scripts/check-advisory-unlinked.sh)" },
+]
 
 [licenses]
 version = 2

@@ -7,6 +7,7 @@ members = [
   "crates/lk-totp",
   "crates/lk-vault",
   "crates/lk-store",
+  "crates/lk-auth",
   "apps/cli",
 ]
 # Fuzz targets need a nightly toolchain and live in their own workspace.
@@ -31,6 +32,7 @@ lk-generator = { path = "crates/lk-generator" }
 lk-totp = { path = "crates/lk-totp" }
 lk-vault = { path = "crates/lk-vault" }
 lk-store = { path = "crates/lk-store" }
+lk-auth = { path = "crates/lk-auth" }
 
 # Cryptography (RustCrypto / dalek / rust-hpke). No custom primitives.
 argon2 = { version = "0.6.0", default-features = false, features = ["alloc", "zeroize"] }
@@ -46,6 +48,12 @@ hpke = { version = "0.15.1", default-features = false, features = ["alloc", "x25
 getrandom = { version = "0.4.3", default-features = false }
 zeroize = { version = "1.9.2", default-features = false, features = ["alloc", "derive"] }
 subtle = { version = "2.6.1", default-features = false }
+
+# OPAQUE (ADR-0005). opaque-ke 4 is built on the previous RustCrypto
+# generation, hence the pinned legacy `sha2`/`rand_core` used only by lk-auth.
+opaque-ke = { version = "4.0.1", default-features = false, features = ["ristretto255", "std"] }
+sha2-legacy = { package = "sha2", version = "0.10.9", default-features = false }
+rand-core-legacy = { package = "rand_core", version = "0.6.4", default-features = false, features = ["getrandom"] }
 
 # Encoding / text
 data-encoding = { version = "2.11.1", default-features = false, features = ["alloc"] }

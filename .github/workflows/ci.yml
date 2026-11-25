@@ -67,6 +67,16 @@ jobs:
         with:
           command: check
 
+  advisory-guard:
+    name: Advisory exception guard (RUSTSEC-2026-0387)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install pinned toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - run: ./scripts/check-advisory-unlinked.sh
+
   docs:
     name: Rustdoc
     runs-on: ubuntu-latest

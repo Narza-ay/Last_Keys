@@ -20,6 +20,7 @@ the security model.
 | Windows and macOS: the Rust core is tested by the CI matrix (GitHub-hosted runners) only, not on physical user machines. | Platform testing with the desktop app (M4) |
 | Strength estimation exists only for generated secrets (exact entropy); passwords chosen by users are not yet scored. | Onboarding screen (M4), security center (Phase 7) |
 | Passphrases use the English EFF wordlist only. | French wordlist with a compatible license (before v0.1) |
+| `opaque-ke` 4 depends on `crypto-bigint` 0.5 (RUSTSEC-2026-0387). The affected code is not linked with our cipher suite (verified in CI); the exception disappears with `opaque-ke` 5. | Migrate when `opaque-ke` 5 is stable |
 | GitHub Actions in CI are pinned to major version tags, not commit SHAs. | Pin to SHAs when the release pipeline is set up (Phase 8) |
 
 ## Platform and design

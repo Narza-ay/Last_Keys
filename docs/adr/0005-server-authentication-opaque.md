@@ -49,6 +49,14 @@ verifier that enables cheap offline guessing if the KDF is skipped.
   build, isolated in `lk-auth`. Re-evaluate when `opaque-ke` 5 is stable.
 * The web application and extension need the client half in WebAssembly
   (to verify at M4/M5).
+* RUSTSEC-2026-0387 (timing variability in `crypto-bigint` 0.5, pulled in by
+  `elliptic-curve` 0.13) cannot be fixed within `opaque-ke` 4. With our
+  Ristretto255 suite the affected code is not linked: verified on an
+  unoptimized build (0 `crypto_bigint` symbols vs 227 `curve25519_dalek`),
+  and re-verified on every CI run (`scripts/check-advisory-unlinked.sh`).
+  The advisory is ignored in `deny.toml` on that basis only. `opaque-ke`
+  5.0 (pre-release at the time of writing) moves to the patched stack;
+  migrate once it is stable.
 
 ## Alternatives considered
 * SRP-6a: older aPAKE with weaker security proofs and fewer maintained Rust
