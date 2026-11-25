@@ -55,6 +55,7 @@ crates/
   lk-auth/            ✅ OPAQUE registration and login, session tokens
   lk-protocol/        ✅ API v1 data types shared by server and clients
   lk-sync/            ✅ client sync engine and typed API client
+  lk-client/          ✅ application layer shared by the CLI and the desktop app
 fuzz/                 ✅ libFuzzer targets (nightly)
 apps/
   cli/                ✅ `lk` command-line client (local vault + synchronization)
@@ -79,6 +80,7 @@ docs/                 specification, architecture, security, ADRs, audit
 | `lk-auth` | M3 | OPAQUE registration/login (RFC 9807), session tokens | ✅ |
 | `lk-protocol` | M3 | Versioned API data types shared by server and clients | ✅ |
 | `lk-sync` | M3 | Typed API client, account registration and device enrollment, sync engine (pull/push, conflict copies, rollback detection, full resynchronization) | ✅ |
+| `lk-client` | M4 | Application layer shared by every client: vault lifecycle (create, enroll, unlock), items through edit drafts, view models without secrets, TOTP, account, sync, devices | ✅ |
 | `lk-import` | M6 | NordPass (then Bitwarden, 1Password, CSV) | 📐 |
 | `lk-wasm` | M4/M5 | `wasm-bindgen` bindings for web app and extension | 📐 |
 | `lk-ffi` | Phase 6 | UniFFI bindings for Kotlin and Swift | 📐 |

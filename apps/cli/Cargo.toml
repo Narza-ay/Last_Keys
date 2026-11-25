@@ -12,14 +12,10 @@ name = "lk"
 path = "src/main.rs"
 
 [dependencies]
-lk-core.workspace = true
+lk-client.workspace = true
 lk-crypto.workspace = true
 lk-generator.workspace = true
-lk-store.workspace = true
-lk-totp.workspace = true
 lk-vault.workspace = true
-lk-auth.workspace = true
-lk-protocol.workspace = true
 lk-sync.workspace = true
 clap.workspace = true
 rpassword.workspace = true
@@ -35,6 +31,7 @@ required-features = ["server-e2e"]
 
 [dev-dependencies]
 tempfile.workspace = true
+lk-auth.workspace = true
 lk-server = { path = "../server" }
 tokio.workspace = true
 sqlx.workspace = true

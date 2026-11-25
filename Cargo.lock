@@ -1370,19 +1370,35 @@ dependencies = [
  "clap",
  "data-encoding",
  "lk-auth",
- "lk-core",
+ "lk-client",
  "lk-crypto",
  "lk-generator",
- "lk-protocol",
  "lk-server",
- "lk-store",
  "lk-sync",
- "lk-totp",
  "lk-vault",
  "rpassword",
  "sqlx",
  "tempfile",
  "tokio",
+]
+
+[[package]]
+name = "lk-client"
+version = "0.1.0"
+dependencies = [
+ "lk-auth",
+ "lk-core",
+ "lk-crypto",
+ "lk-protocol",
+ "lk-store",
+ "lk-sync",
+ "lk-totp",
+ "lk-vault",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "url",
 ]
 
 [[package]]

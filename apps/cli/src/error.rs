@@ -2,8 +2,6 @@
 
 use core::fmt;
 
-use lk_core::CoreError;
-
 /// A CLI failure.
 pub(crate) enum CliError {
     /// Message shown as-is.
@@ -28,25 +26,32 @@ pub(crate) fn fail(message: impl Into<String>) -> CliError {
     CliError::Message(message.into())
 }
 
-impl From<lk_sync::SyncError> for CliError {
-    fn from(e: lk_sync::SyncError) -> Self {
+impl From<lk_client::ClientError> for CliError {
+    fn from(e: lk_client::ClientError) -> Self {
+        use lk_client::ClientError;
         match e {
-            lk_sync::SyncError::InvalidCredentials => Self::Credentials,
-            rollback @ lk_sync::SyncError::ServerRollback(_) => Self::Message(format!(
-                "{rollback}.\nIf the server administrator restored a backup, run `lk sync --reset`: \
-                 every item of this device is uploaded again and versions that differ from the \
-                 server's are kept as conflict copies (nothing is deleted).\nOtherwise do not \
-                 reset: the server may be misbehaving; contact its administrator."
+            ClientError::InvalidCredentials => Self::Credentials,
+            ClientError::NoVault(path) => Self::Message(format!(
+                "no vault at {} (create one with `lk init`)",
+                path.display()
             )),
-            other => Self::Other(Box::new(other)),
-        }
-    }
-}
-
-impl From<CoreError> for CliError {
-    fn from(e: CoreError) -> Self {
-        match e {
-            CoreError::InvalidCredentials => Self::Credentials,
+            ClientError::NotRegistered => Self::Message(
+                "this vault is not registered on a server (use `lk register` or `lk login`)"
+                    .to_owned(),
+            ),
+            ClientError::NoVaultOnServer => Self::Message(
+                "the account has no vault on the server yet; run `lk sync` on a registered device first"
+                    .to_owned(),
+            ),
+            ClientError::Sync(rollback @ lk_sync::SyncError::ServerRollback(_)) => {
+                Self::Message(format!(
+                    "{rollback}.\nIf the server administrator restored a backup, run `lk sync --reset`: \
+                     every item of this device is uploaded again and versions that differ from the \
+                     server's are kept as conflict copies (nothing is deleted).\nOtherwise do not \
+                     reset: the server may be misbehaving; contact its administrator."
+                ))
+            }
+            ClientError::Sync(lk_sync::SyncError::InvalidCredentials) => Self::Credentials,
             other => Self::Other(Box::new(other)),
         }
     }
@@ -65,10 +70,8 @@ macro_rules! boxed_from {
 boxed_from!(
     std::io::Error,
     lk_crypto::CryptoError,
-    lk_store::StoreError,
     lk_vault::VaultError,
     lk_generator::GeneratorError,
-    lk_totp::TotpError,
 );
 
 pub(crate) type Result<T> = core::result::Result<T, CliError>;

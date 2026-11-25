@@ -18,27 +18,16 @@ use std::process::ExitCode;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use clap::{Args, Parser, Subcommand};
-use lk_core::{AccountKeys, DeviceIdentity, PasswordKeys, Platform, VaultKey, create_account};
-use lk_crypto::{KdfParams, MasterPassword, RecoveryKey};
+use lk_client::{Credential, DeviceStatus, MasterPassword, Platform, RecoveryKey, Vault};
 use lk_generator::{PassphrasePolicy, PasswordPolicy, generate_passphrase, generate_password};
-use lk_protocol::CredentialKind;
-use lk_store::{Store, StoredItem};
-use lk_sync::{
-    Api, SyncReport, UreqTransport, enroll_device, login_registered, register_account,
-    resync_vault, sync_vault,
-};
-use lk_totp::Totp;
 use lk_vault::{
-    ItemContent, ItemData, ItemKind, Login, PaymentCard, SecretString, SecureNote, codec,
-    normalize_totp, normalize_url,
+    ItemContent, ItemData, ItemKind, Login, PaymentCard, SecretString, SecureNote, normalize_totp,
+    normalize_url,
 };
 
 use crate::error::{Result, fail};
 use crate::format::{short_id, utc};
 use crate::input::SecretInput;
-
-/// Minimum master password length accepted by this client (characters).
-const MIN_MASTER_PASSWORD_CHARS: usize = 12;
 
 #[derive(Parser)]
 #[command(name = "lk", version, about = "Last Keys command-line client")]
@@ -314,7 +303,7 @@ fn run(cli: Cli) -> Result<()> {
         command => {
             let mut session = Session::open(&path, &mut input, cli.recovery_key)?;
             match command {
-                Command::Info => session.info(&path),
+                Command::Info => session.info(),
                 Command::Add(add) => session.add(add, &mut input),
                 Command::List { query } => session.list(query.as_deref()),
                 Command::Show { item, reveal } => session.show(item, *reveal),
@@ -325,7 +314,7 @@ fn run(cli: Cli) -> Result<()> {
                 Command::Passwd => session.passwd(&mut input),
                 Command::Recovery(RecoveryCommand::Rotate) => session.rotate_recovery(),
                 Command::Register { server, email } => session.register(&mut input, server, email),
-                Command::Sync { reset } => session.sync(*reset).map(|_| ()),
+                Command::Sync { reset } => session.sync(*reset),
                 Command::Devices => session.devices(),
                 Command::Revoke { device } => session.revoke(device),
                 Command::Generate(_) | Command::Init { .. } | Command::Login { .. } => Ok(()),
@@ -336,12 +325,7 @@ fn run(cli: Cli) -> Result<()> {
 
 fn read_new_master_password(input: &mut SecretInput) -> Result<MasterPassword> {
     let pw = input.read_confirmed("New master password: ", "Repeat the master password: ")?;
-    if pw.chars().count() < MIN_MASTER_PASSWORD_CHARS {
-        return Err(fail(format!(
-            "the master password must have at least {MIN_MASTER_PASSWORD_CHARS} characters"
-        )));
-    }
-    Ok(MasterPassword::new(&pw)?)
+    Ok(lk_client::new_master_password(&pw, &pw)?)
 }
 
 fn print_recovery_key(rk: &RecoveryKey) -> Result<()> {
@@ -356,38 +340,35 @@ fn print_recovery_key(rk: &RecoveryKey) -> Result<()> {
     Ok(())
 }
 
+fn print_sync(summary: &lk_client::SyncSummary) {
+    println!(
+        "Synchronized: {} received, {} sent, {} conflict(s){}",
+        summary.received,
+        summary.sent,
+        summary.conflicts,
+        if summary.conflict_copies == 0 {
+            String::new()
+        } else {
+            format!(
+                " — {} conflict copy(ies) created, nothing was lost",
+                summary.conflict_copies
+            )
+        }
+    );
+}
+
 fn init(path: &Path, input: &mut SecretInput, device_name: &str) -> Result<()> {
     if path.exists() {
-        return Err(fail(format!(
-            "a vault already exists at {}",
-            path.display()
-        )));
-    }
-    if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
-        let mut builder = std::fs::DirBuilder::new();
-        builder.recursive(true);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::DirBuilderExt;
-            builder.mode(0o700);
-        }
-        builder.create(parent)?;
+        return Err(lk_client::ClientError::VaultExists(path.to_path_buf()).into());
     }
     let password = read_new_master_password(input)?;
     eprintln!("Deriving keys (Argon2id)...");
-    let account = create_account(&password, KdfParams::recommended())?;
-    let now = now();
-    let device = DeviceIdentity::generate()?;
-    let info = device.public_info(device_name, Platform::Cli, now)?;
-    let certificate = account.keys.certify_device(info, now)?;
-    let sealed = account.keys.seal_device_identity(&device)?;
-    let mut store = Store::create(path, &account.bundle, &sealed, Some(&certificate), now)?;
-    let (_, wrapped) = account.keys.create_vault()?;
-    store.put_wrapped_vault_key(&wrapped)?;
+    let created = Vault::create(path, &password, device_name, Platform::Cli, now())?;
+    let info = created.vault.info()?;
     println!("Vault created: {}", path.display());
-    println!("Account: {}", account.keys.account_id());
-    println!("Device:  {}", device.device_id());
-    print_recovery_key(&account.recovery_key)
+    println!("Account: {}", info.account_id);
+    println!("Device:  {}", info.device_id);
+    print_recovery_key(&created.recovery_key)
 }
 
 /// Sets up this device from an existing account: enrollment with the master
@@ -400,66 +381,29 @@ fn login_new_device(
     device_name: &str,
 ) -> Result<()> {
     if path.exists() {
-        return Err(fail(format!(
-            "a vault already exists at {}",
-            path.display()
-        )));
+        return Err(lk_client::ClientError::VaultExists(path.to_path_buf()).into());
     }
-    let email = lk_auth::normalize_email(email).map_err(|_| fail("invalid e-mail address"))?;
-    let api = Api::new(UreqTransport::new(server)?);
     let password = MasterPassword::new(&input.read("Master password: ")?)?;
     eprintln!("Deriving keys (Argon2id)...");
-    let device = DeviceIdentity::generate()?;
-    let now = now();
-    let enrollment = enroll_device(
-        &api,
-        &email,
+    let enrolled = Vault::enroll(
+        path,
+        server,
+        email,
         &password,
-        &device,
         device_name,
         Platform::Cli,
-        now,
+        now(),
     )?;
-    let vaults = api.vault_keys(&enrollment.session)?;
-    if vaults.is_empty() {
-        return Err(fail(
-            "the account has no vault on the server yet; run `lk sync` on a registered device first",
-        ));
-    }
-    if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
-        let mut builder = std::fs::DirBuilder::new();
-        builder.recursive(true);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::DirBuilderExt;
-            builder.mode(0o700);
-        }
-        builder.create(parent)?;
-    }
-    let sealed = enrollment.keys.seal_device_identity(&device)?;
-    let mut store = Store::create(
-        path,
-        &enrollment.bundle,
-        &sealed,
-        Some(&enrollment.certificate),
-        now,
-    )?;
-    store.set_remote(&lk_sync::normalize_server_url(server)?, &email)?;
-    let mut received = 0usize;
-    for wrapped in &vaults {
-        store.put_wrapped_vault_key(wrapped)?;
-        let vault = enrollment.keys.open_vault_key(wrapped)?;
-        let report = sync_vault(&api, &enrollment.session, &mut store, &vault, wrapped, now)?;
-        received = received.saturating_add(report.pulled);
-    }
-    let _ = api.logout(&enrollment.session);
+    let info = enrolled.vault.info()?;
+    let remote = info.remote.as_ref().map_or("", |r| r.email.as_str());
     println!(
-        "Device {} enrolled on {server} as {email}.",
-        device.device_id()
+        "Device {} enrolled on {server} as {remote}.",
+        info.device_id
     );
     println!(
-        "Vault created: {} ({received} item(s) received)",
-        path.display()
+        "Vault created: {} ({} item(s) received)",
+        path.display(),
+        enrolled.received
     );
     Ok(())
 }
@@ -518,217 +462,75 @@ fn optional_secret(input: &mut SecretInput, prompt: &str) -> Result<Option<Secre
     Ok((!value.is_empty()).then(|| SecretString::new(value.as_str())))
 }
 
-/// An unlocked vault.
+/// An unlocked vault (the application logic lives in `lk-client`).
 struct Session {
-    store: Store,
-    keys: AccountKeys,
-    vault: VaultKey,
-    device: DeviceIdentity,
-    /// Present when unlocked with the master password.
-    password_keys: Option<PasswordKeys>,
-    /// Present when unlocked with the recovery key.
-    recovery_key: Option<RecoveryKey>,
+    vault: Vault,
 }
 
 impl Session {
     fn open(path: &Path, input: &mut SecretInput, use_recovery_key: bool) -> Result<Self> {
         if !path.exists() {
-            return Err(fail(format!(
-                "no vault at {} (create one with `lk init`)",
-                path.display()
-            )));
+            return Err(lk_client::ClientError::NoVault(path.to_path_buf()).into());
         }
-        let store = Store::open(path)?;
-        let bundle = store.account_bundle()?;
-        let (keys, password_keys, recovery_key) = if use_recovery_key {
-            let text = input.read("Recovery key: ")?;
-            let rk = RecoveryKey::parse(&text)?;
-            (bundle.unlock_with_recovery_key(&rk)?, None, Some(rk))
+        let vault = if use_recovery_key {
+            let rk = RecoveryKey::parse(&input.read("Recovery key: ")?)?;
+            Vault::unlock(path, &Credential::RecoveryKey(&rk))?
         } else {
-            let pw = input.read("Master password: ")?;
-            let pkeys = PasswordKeys::derive(&MasterPassword::new(&pw)?, &bundle.kdf)?;
-            (bundle.unlock_with_password_keys(&pkeys)?, Some(pkeys), None)
+            let pw = MasterPassword::new(&input.read("Master password: ")?)?;
+            Vault::unlock(path, &Credential::MasterPassword(&pw))?
         };
-        // Integrity check of the local device identity.
-        let device = keys.open_device_identity(&store.sealed_device()?)?;
-        let wrapped = store.wrapped_vault_keys()?;
-        let first = wrapped
-            .first()
-            .ok_or_else(|| fail("the store contains no vault"))?;
-        let vault = keys.open_vault_key(first)?;
-        Ok(Self {
-            store,
-            keys,
-            vault,
-            device,
-            password_keys,
-            recovery_key,
-        })
-    }
-
-    fn remote(&self) -> Result<Option<(Api<UreqTransport>, String)>> {
-        match self.store.remote()? {
-            Some((url, email)) => Ok(Some((Api::new(UreqTransport::new(&url)?), email))),
-            None => Ok(None),
-        }
-    }
-
-    fn remote_required(&self) -> Result<(Api<UreqTransport>, String)> {
-        self.remote()?.ok_or_else(|| {
-            fail("this vault is not registered on a server (use `lk register` or `lk login`)")
-        })
-    }
-
-    fn full_session(&self, api: &Api<UreqTransport>, email: &str) -> Result<lk_sync::Session> {
-        let keys = self.password_keys.as_ref().ok_or_else(|| {
-            fail("this operation needs the master password, not the recovery key")
-        })?;
-        Ok(login_registered(api, email, keys, &self.device)?)
+        Ok(Self { vault })
     }
 
     fn register(&mut self, input: &mut SecretInput, server: &str, email: &str) -> Result<()> {
-        if self.store.remote()?.is_some() {
-            return Err(fail("this vault is already registered on a server"));
+        if self.vault.remote_view()?.is_some() {
+            return Err(lk_client::ClientError::AlreadyRegistered.into());
         }
-        let email = lk_auth::normalize_email(email).map_err(|_| fail("invalid e-mail address"))?;
-        let password_keys = self
-            .password_keys
-            .as_ref()
-            .ok_or_else(|| fail("registration needs the master password"))?;
         let recovery = RecoveryKey::parse(
             &input.read("Recovery key (to register the recovery credential): ")?,
         )?;
-        let certificate = self
-            .store
-            .device_certificate()?
-            .ok_or_else(|| fail("this device has no certificate"))?;
-        let api = Api::new(UreqTransport::new(server)?);
-        let bundle = self.store.account_bundle()?;
-        register_account(
-            &api,
-            &email,
-            password_keys,
-            &recovery,
-            &bundle,
-            &certificate,
-        )?;
-        self.store
-            .set_remote(&lk_sync::normalize_server_url(server)?, &email)?;
+        let summary = self.vault.register(server, email, &recovery, now())?;
+        let email = self
+            .vault
+            .remote_view()?
+            .map_or_else(String::new, |r| r.email);
         println!("Registered {email} on {server}.");
-        self.sync(false)?;
+        print_sync(&summary);
         Ok(())
     }
 
-    fn sync(&mut self, reset: bool) -> Result<SyncReport> {
-        let (api, email) = self.remote_required()?;
-        let session = self.full_session(&api, &email)?;
-        let mut total = SyncReport::default();
+    fn sync(&mut self, reset: bool) -> Result<()> {
         if reset {
             println!("Full resynchronization: every item of this device is uploaded again.");
         }
-        for wrapped in self.store.wrapped_vault_keys()? {
-            let vault = self.keys.open_vault_key(&wrapped)?;
-            let r = if reset {
-                resync_vault(&api, &session, &mut self.store, &vault, &wrapped, now())?
-            } else {
-                sync_vault(&api, &session, &mut self.store, &vault, &wrapped, now())?
-            };
-            total.pulled = total.pulled.saturating_add(r.pulled);
-            total.pushed = total.pushed.saturating_add(r.pushed);
-            total.conflicts = total.conflicts.saturating_add(r.conflicts);
-            total.conflict_copies.extend(r.conflict_copies);
-        }
-        let _ = api.logout(&session);
-        println!(
-            "Synchronized: {} received, {} sent, {} conflict(s){}",
-            total.pulled,
-            total.pushed,
-            total.conflicts,
-            if total.conflict_copies.is_empty() {
-                String::new()
-            } else {
-                format!(
-                    " — {} conflict copy(ies) created, nothing was lost",
-                    total.conflict_copies.len()
-                )
-            }
-        );
-        Ok(total)
+        let summary = self.vault.sync(reset, now())?;
+        print_sync(&summary);
+        Ok(())
     }
 
     fn devices(&self) -> Result<()> {
-        let (api, email) = self.remote_required()?;
-        let session = self.full_session(&api, &email)?;
-        let list = api.devices(&session)?;
-        let _ = api.logout(&session);
-        let certificates: Vec<_> = list.devices.iter().map(|d| d.certificate.clone()).collect();
-        let revocations: Vec<_> = list
-            .devices
-            .iter()
-            .filter_map(|d| d.revocation.clone())
-            .collect();
-        // Fail closed: one forged entry invalidates the whole list.
-        let trusted = lk_core::trusted_devices(
-            &self.keys.account_id(),
-            &self.keys.signing_public_key(),
-            &certificates,
-            &revocations,
-        )
-        .map_err(|_| fail("the device list returned by the server failed verification"))?;
-        for entry in &list.devices {
-            let d = &entry.certificate.device;
-            let status = if d.device_id == self.device.device_id() {
-                "this device"
-            } else if entry.revocation.is_some() {
-                "revoked"
-            } else if trusted.iter().any(|t| t.device_id == d.device_id) {
-                "active"
-            } else {
-                "untrusted"
+        for d in self.vault.devices()? {
+            let status = match d.status {
+                DeviceStatus::ThisDevice => "this device",
+                DeviceStatus::Active => "active",
+                DeviceStatus::Revoked => "revoked",
             };
             println!(
                 "{}  {:<12} {:<20} {:?}, enrolled {}, last seen {}",
-                d.device_id.to_string().chars().take(8).collect::<String>(),
+                d.id.to_string().chars().take(8).collect::<String>(),
                 status,
                 d.name,
                 d.platform,
-                utc(d.created_at_unix),
-                entry.last_seen_unix.map_or_else(|| "never".to_owned(), utc)
+                utc(d.enrolled_at),
+                d.last_seen.map_or_else(|| "never".to_owned(), utc)
             );
         }
         Ok(())
     }
 
     fn revoke(&self, reference: &str) -> Result<()> {
-        let r = reference.trim().to_lowercase();
-        if r.chars().count() < 4 {
-            return Err(fail(
-                "a device reference needs at least 4 characters of its ID",
-            ));
-        }
-        let (api, email) = self.remote_required()?;
-        let session = self.full_session(&api, &email)?;
-        let list = api.devices(&session)?;
-        let matches: Vec<_> = list
-            .devices
-            .iter()
-            .filter(|d| d.certificate.device.device_id.to_string().starts_with(&r))
-            .collect();
-        let target = match matches.as_slice() {
-            [one] => one.certificate.device.device_id,
-            [] => return Err(fail(format!("no device matches {reference}"))),
-            _ => {
-                return Err(fail(format!(
-                    "several devices match {reference}; give more characters"
-                )));
-            }
-        };
-        if target == self.device.device_id() {
-            return Err(fail("this is the current device; it cannot revoke itself"));
-        }
-        let revocation = self.keys.revoke_device(target, now())?;
-        api.revoke(&session, &revocation)?;
-        let _ = api.logout(&session);
+        let target = self.vault.find_device(reference)?;
+        self.vault.revoke_device(target, now())?;
         println!("Device {target} revoked. It can no longer reach the server.");
         eprintln!(
             "Note: data that device already decrypted cannot be erased remotely; \
@@ -737,84 +539,42 @@ impl Session {
         Ok(())
     }
 
-    fn decrypted_items(&self) -> Result<Vec<(StoredItem, ItemData)>> {
-        let mut out = Vec::new();
-        for stored in self.store.items(&self.vault.vault_id())? {
-            let data = codec::open(&self.vault, &stored.item)?;
-            out.push((stored, data));
-        }
-        Ok(out)
+    fn resolve(&self, reference: &str) -> Result<(lk_client::ItemId, ItemData)> {
+        let id = self.vault.find(reference)?;
+        Ok((id, self.vault.item(&id)?))
     }
 
-    fn resolve(&self, reference: &str) -> Result<(StoredItem, ItemData)> {
-        let r = reference.trim().to_lowercase();
-        if r.chars().count() < 4 {
-            return Err(fail(
-                "an item reference needs at least 4 characters of its ID",
-            ));
-        }
-        let mut matches: Vec<StoredItem> = self
-            .store
-            .items(&self.vault.vault_id())?
-            .into_iter()
-            .filter(|s| s.item.item_id.to_string().starts_with(&r))
-            .collect();
-        match matches.len() {
-            0 => Err(fail(format!("no item matches {reference}"))),
-            1 => {
-                let stored = matches.remove(0);
-                let data = codec::open(&self.vault, &stored.item)?;
-                Ok((stored, data))
-            }
-            n => Err(fail(format!(
-                "{n} items match {reference}; give more characters"
-            ))),
-        }
-    }
-
-    fn save_new(&mut self, data: &ItemData) -> Result<()> {
-        let sealed = codec::seal_new(&self.vault, data)?;
-        self.store.upsert_item(&sealed, now())?;
-        println!("Added {}  {}", short_id(&sealed.item_id), data.title);
-        Ok(())
-    }
-
-    fn info(&self, path: &Path) -> Result<()> {
-        let bundle = self.store.account_bundle()?;
-        let params = bundle.kdf.params()?;
-        println!("Vault file:     {}", path.display());
-        println!("Account:        {}", self.keys.account_id());
-        if let Some(cert) = self.store.device_certificate()? {
-            println!(
-                "Device:         {} ({}, {:?}, enrolled {})",
-                cert.device.device_id,
-                cert.device.name,
-                cert.device.platform,
-                utc(cert.device.created_at_unix)
-            );
-        }
+    fn info(&self) -> Result<()> {
+        let info = self.vault.info()?;
+        println!("Vault file:     {}", self.vault.path().display());
+        println!("Account:        {}", info.account_id);
+        println!(
+            "Device:         {} ({}, {:?}, enrolled {})",
+            info.device_id,
+            info.device_name,
+            info.platform,
+            utc(info.enrolled_at)
+        );
         println!(
             "Key derivation: Argon2id, {} MiB, {} passes, {} lanes",
-            params.memory_kib / 1024,
-            params.iterations,
-            params.parallelism
+            info.kdf.memory_kib / 1024,
+            info.kdf.iterations,
+            info.kdf.parallelism
         );
         println!(
             "Recovery key:   {}",
-            if bundle.account_key_by_recovery.is_some() {
+            if info.recovery_key_configured {
                 "configured"
             } else {
                 "none"
             }
         );
-        println!(
-            "Items:          {}",
-            self.store.items(&self.vault.vault_id())?.len()
-        );
-        println!(
-            "Pending sync:   {} local changes (sync arrives in M3)",
-            self.store.pending_changes()?.len()
-        );
+        println!("Items:          {}", info.items);
+        match &info.remote {
+            Some(r) => println!("Server:         {} ({})", r.server, r.email),
+            None => println!("Server:         not registered"),
+        }
+        println!("Pending sync:   {} local change(s)", info.pending_changes);
         println!(
             "Local protection: software — keys encrypted with the master password; no platform key store yet (M7)"
         );
@@ -863,13 +623,11 @@ impl Session {
                 if *notes {
                     item.notes = optional_secret(input, "Notes: ")?;
                 }
-                item.validate()?;
                 item
             }
             AddCommand::Note { title } => {
                 let mut item = ItemData::new(title, ItemContent::SecureNote(SecureNote {}), now)?;
                 item.notes = optional_secret(input, "Note: ")?;
-                item.validate()?;
                 item
             }
             AddCommand::Card {
@@ -903,32 +661,22 @@ impl Session {
                 )?
             }
         };
-        self.save_new(&data)
+        let id = self.vault.create_item(&data, now)?;
+        println!("Added {}  {}", short_id(&id), data.title);
+        Ok(())
     }
 
     fn list(&self, query: Option<&str>) -> Result<()> {
-        let mut rows: Vec<(StoredItem, ItemData)> = self
-            .decrypted_items()?
-            .into_iter()
-            .filter(|(_, d)| d.matches(query.unwrap_or("")))
-            .collect();
-        rows.sort_by_key(|(_, d)| d.title.to_lowercase());
-        for (stored, data) in &rows {
-            let detail = match &data.content {
-                ItemContent::Login(l) => l.username.clone().unwrap_or_default(),
-                ItemContent::PaymentCard(c) => c.cardholder_name.clone().unwrap_or_default(),
-                _ => String::new(),
-            };
+        let rows = self.vault.items(query.unwrap_or(""))?;
+        for row in &rows {
             println!(
                 "{}  {:<12} {}{}",
-                short_id(&stored.item.item_id),
-                kind_name(data.kind()),
-                data.title,
-                if detail.is_empty() {
-                    String::new()
-                } else {
-                    format!("  ({detail})")
-                }
+                short_id(&row.id),
+                kind_name(row.kind),
+                row.title,
+                row.subtitle
+                    .as_ref()
+                    .map_or_else(String::new, |s| format!("  ({s})"))
             );
         }
         if rows.is_empty() {
@@ -938,7 +686,7 @@ impl Session {
     }
 
     fn show(&self, reference: &str, reveal: bool) -> Result<()> {
-        let (stored, data) = self.resolve(reference)?;
+        let (id, data) = self.resolve(reference)?;
         let secret = |s: &SecretString| {
             if reveal {
                 s.expose().to_owned()
@@ -946,7 +694,7 @@ impl Session {
                 "•••••••• (use --reveal)".to_owned()
             }
         };
-        println!("ID:        {}", stored.item.item_id);
+        println!("ID:        {id}");
         println!("Type:      {}", kind_name(data.kind()));
         println!("Title:     {}", data.title);
         if data.favorite {
@@ -970,10 +718,7 @@ impl Session {
                     println!("URL:       {url}");
                 }
                 if l.totp.is_some() {
-                    println!(
-                        "TOTP:      configured (`lk totp {}`)",
-                        short_id(&stored.item.item_id)
-                    );
+                    println!("TOTP:      configured (`lk totp {}`)", short_id(&id));
                 }
                 if !l.backup_codes.is_empty() {
                     println!("Backup codes: {}", l.backup_codes.len());
@@ -1029,65 +774,70 @@ impl Session {
     }
 
     fn edit(&mut self, args: &EditArgs, input: &mut SecretInput) -> Result<()> {
-        let (stored, mut data) = self.resolve(&args.item)?;
-        let now = now().max(data.updated_at);
-        if let Some(title) = &args.title {
-            data.title = title.trim().to_owned();
-        }
-        if let Some(favorite) = args.favorite {
-            data.favorite = favorite;
-        }
-        if args.username.is_some() || !args.add_urls.is_empty() {
-            let ItemContent::Login(login) = &mut data.content else {
-                return Err(fail("--username and --add-url apply to logins only"));
-            };
-            if let Some(u) = &args.username {
-                login.username = Some(u.clone()).filter(|u| !u.is_empty());
+        let id = self.vault.find(&args.item)?;
+        // Read every secret before modifying the item.
+        let new_password = if args.password {
+            let new = input.read_confirmed("New password: ", "Repeat the new password: ")?;
+            Some(SecretString::new(new.as_str()))
+        } else if args.generate {
+            Some(simple_password(args.length)?)
+        } else {
+            None
+        };
+        let revision = self.vault.update_item(&id, now(), |data| {
+            let now = now().max(data.updated_at);
+            if let Some(title) = &args.title {
+                data.title = title.trim().to_owned();
             }
-            for url in &args.add_urls {
-                let url = normalize_url(url)?;
-                if !login.urls.contains(&url) {
-                    login.urls.push(url);
+            if let Some(favorite) = args.favorite {
+                data.favorite = favorite;
+            }
+            if args.username.is_some() || !args.add_urls.is_empty() {
+                let ItemContent::Login(login) = &mut data.content else {
+                    return Err(lk_client::ClientError::InvalidDraft(
+                        "--username and --add-url apply to logins only",
+                    ));
+                };
+                if let Some(u) = &args.username {
+                    login.username = Some(u.clone()).filter(|u| !u.is_empty());
+                }
+                for url in &args.add_urls {
+                    let url = normalize_url(url)?;
+                    if !login.urls.contains(&url) {
+                        login.urls.push(url);
+                    }
                 }
             }
-        }
-        if args.password {
-            let new = input.read_confirmed("New password: ", "Repeat the new password: ")?;
-            data.change_password(SecretString::new(new.as_str()), now)?;
-        } else if args.generate {
-            data.change_password(simple_password(args.length)?, now)?;
-        }
-        if let Some(index) = args.restore_password {
-            data.restore_password(
-                index
+            if let Some(password) = new_password {
+                data.change_password(password, now)?;
+            }
+            if let Some(index) = args.restore_password {
+                let index = index
                     .checked_sub(1)
-                    .ok_or_else(|| fail("history entries start at 1"))?,
-                now,
-            )?;
-        }
-        if let Some(index) = args.delete_history {
-            data.delete_history_entry(
-                index
+                    .ok_or(lk_client::ClientError::InvalidDraft(
+                        "history entries start at 1",
+                    ))?;
+                data.restore_password(index, now)?;
+            }
+            if let Some(index) = args.delete_history {
+                let index = index
                     .checked_sub(1)
-                    .ok_or_else(|| fail("history entries start at 1"))?,
-                now,
-            )?;
-        }
-        data.updated_at = now;
-        let sealed = codec::seal_update(&self.vault, &stored.item, &data)?;
-        let revision = self.store.upsert_item(&sealed, now)?;
-        println!(
-            "Updated {}  {} (revision {revision})",
-            short_id(&sealed.item_id),
-            data.title
-        );
+                    .ok_or(lk_client::ClientError::InvalidDraft(
+                        "history entries start at 1",
+                    ))?;
+                data.delete_history_entry(index, now)?;
+            }
+            Ok(())
+        })?;
+        let title = self.vault.item(&id)?.title;
+        println!("Updated {}  {title} (revision {revision})", short_id(&id));
         Ok(())
     }
 
     fn delete(&mut self, reference: &str) -> Result<()> {
-        let (stored, data) = self.resolve(reference)?;
-        self.store.delete_item(&stored.item.item_id, now())?;
-        println!("Deleted {}  {}", short_id(&stored.item.item_id), data.title);
+        let (id, data) = self.resolve(reference)?;
+        self.vault.delete_item(&id, now())?;
+        println!("Deleted {}  {}", short_id(&id), data.title);
         Ok(())
     }
 
@@ -1115,18 +865,10 @@ impl Session {
     }
 
     fn totp(&self, reference: &str) -> Result<()> {
-        let (_, data) = self.resolve(reference)?;
-        let ItemContent::Login(Login {
-            totp: Some(uri), ..
-        }) = &data.content
-        else {
-            return Err(fail("this item has no TOTP configuration"));
-        };
-        let totp = Totp::from_uri(uri.expose())?;
-        let now = now();
-        let code = totp.code_at(now)?;
-        println!("{}", code.as_str());
-        eprintln!("valid for {} s", totp.seconds_remaining(now));
+        let id = self.vault.find(reference)?;
+        let code = self.vault.totp(&id, now())?;
+        println!("{}", code.code);
+        eprintln!("valid for {} s", code.remaining);
         Ok(())
     }
 
@@ -1135,40 +877,14 @@ impl Session {
     /// if that fails, nothing changes locally.
     fn passwd(&mut self, input: &mut SecretInput) -> Result<()> {
         let new = read_new_master_password(input)?;
-        let bundle = self.store.account_bundle()?;
         eprintln!("Deriving keys (Argon2id)...");
-        let (updated, new_auth) =
-            self.keys
-                .change_password(&bundle, &new, KdfParams::recommended())?;
-        if let Some((api, email)) = self.remote()? {
-            let session = match &self.recovery_key {
-                Some(rk) => api.login(
-                    &email,
-                    &rk.server_auth_key().map_err(lk_core::CoreError::from)?,
-                    CredentialKind::Recovery,
-                    self.device.device_id(),
-                )?,
-                None => self.full_session(&api, &email)?,
-            };
-            api.replace_credential(&session, CredentialKind::Password, &new_auth, &updated)?;
-            if self.recovery_key.is_none() {
-                let _ = api.logout(&session);
-            }
-        }
-        self.store.replace_account_bundle(&updated, now())?;
+        self.vault.change_master_password(&new, now())?;
         println!("Master password changed. Your recovery key is unchanged.");
         Ok(())
     }
 
     fn rotate_recovery(&mut self) -> Result<()> {
-        let bundle = self.store.account_bundle()?;
-        let (updated, recovery_key, new_auth) = self.keys.rotate_recovery_key(&bundle)?;
-        if let Some((api, email)) = self.remote()? {
-            let session = self.full_session(&api, &email)?;
-            api.replace_credential(&session, CredentialKind::Recovery, &new_auth, &updated)?;
-            let _ = api.logout(&session);
-        }
-        self.store.replace_account_bundle(&updated, now())?;
+        let recovery_key = self.vault.rotate_recovery_key(now())?;
         println!("Recovery key replaced. The previous one no longer works.");
         print_recovery_key(&recovery_key)
     }

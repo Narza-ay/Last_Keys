@@ -1,6 +1,6 @@
 //! Output helpers.
 
-use lk_core::ItemId;
+use lk_client::ItemId;
 
 /// First 8 characters of an item identifier (enough to reference it).
 pub(crate) fn short_id(id: &ItemId) -> String {

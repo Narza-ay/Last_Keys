@@ -10,6 +10,7 @@ members = [
   "crates/lk-auth",
   "crates/lk-protocol",
   "crates/lk-sync",
+  "crates/lk-client",
   "apps/cli",
   "apps/server",
 ]
@@ -38,6 +39,7 @@ lk-store = { path = "crates/lk-store" }
 lk-auth = { path = "crates/lk-auth" }
 lk-protocol = { path = "crates/lk-protocol" }
 lk-sync = { path = "crates/lk-sync" }
+lk-client = { path = "crates/lk-client" }
 
 # Cryptography (RustCrypto / dalek / rust-hpke). No custom primitives.
 argon2 = { version = "0.6.0", default-features = false, features = ["alloc", "zeroize"] }
