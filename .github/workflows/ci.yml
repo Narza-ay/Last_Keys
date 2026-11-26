@@ -154,7 +154,10 @@ jobs:
       - name: Install WebKitGTK, its WebDriver, a virtual display and xclip
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev librsvg2-dev libayatana-appindicator3-dev libxdo-dev webkit2gtk-driver xvfb xclip
+          # The WebDriver package was renamed in Ubuntu 26.04.
+          driver=$(apt-cache show webkitgtk-webdriver > /dev/null 2>&1 && echo webkitgtk-webdriver || echo webkit2gtk-driver)
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev librsvg2-dev libayatana-appindicator3-dev libxdo-dev "$driver" xvfb xclip
+          command -v WebKitWebDriver
       - name: Install tauri-driver
         run: cargo install tauri-driver --version 2.1.0 --locked
       - name: Build the application (front end embedded)

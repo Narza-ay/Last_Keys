@@ -65,7 +65,7 @@ npm run test:e2e                    # Playwright: the interface in Chromium
 cargo test -p lk-desktop            # Rust back end
 npx tauri build --debug --no-bundle && xvfb-run -a node e2e-tauri/run.mjs
                                     # the real application (Linux, needs
-                                    # tauri-driver, webkit2gtk-driver, xclip)
+                                    # tauri-driver, WebKitWebDriver, xclip)
 ```
 
 ## Build installers
