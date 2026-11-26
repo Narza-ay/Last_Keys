@@ -64,9 +64,10 @@ mitigation: ✅ implemented and tested · 📐 designed · ⬜ planned.
 | Threat | Mitigation | Status |
 |--------|------------|--------|
 | T5 reads local storage | Local store holds only envelopes; device-local key in hardware-backed store where available; protection level shown truthfully. | 📐 M2/Phase 5 |
-| Secrets left in memory | Zeroization on drop, no `Debug` leakage, panic=abort in release, auto-lock. Best effort: GC languages (Kotlin/Swift/JS) cannot guarantee erasure. | ✅ core, 📐 apps |
-| Clipboard exposure | Timed clipboard clearing, exclude-from-history flags where the OS supports them. | ⬜ Phase 6 |
-| T7 malware on unlocked device | Out of scope for prevention (same privileges as user); reduce window with auto-lock and re-authentication for sensitive fields. | 📐 |
+| Secrets left in memory | Zeroization on drop, no `Debug` leakage, panic=abort in release, auto-lock. Best effort: GC languages (Kotlin/Swift/JS) cannot guarantee erasure. The desktop keeps keys and decrypted items in Rust; the web view only holds a secret the user revealed (hidden again after 30 s) and the master password while it is typed (ADR-0010). | ✅ core and desktop, 📐 mobile/web |
+| Clipboard exposure | Copies made by Rust, cleared after a configurable delay (default 30 s) and on lock and exit if still present; exclude-from-history flags on Windows, macOS and KDE. | ✅ desktop (clearing tested on the real app), ⬜ mobile/extension |
+| T7 malware on unlocked device | Out of scope for prevention (same privileges as user); reduce window with auto-lock and re-authentication for sensitive fields. | ✅ desktop: auto-lock after inactivity, current password required to change it or to replace the recovery key; system-lock hooks pending |
+| Script injection in the desktop web view (a malicious item title, a crafted server answer) | React escapes all text; lint forbids `innerHTML`; strict CSP (`script-src 'self'`, no remote content); no plugin, file-system or shell access for the web view; the server is reached by Rust only. | ✅ desktop |
 
 ### Autofill and passkeys
 | Threat | Mitigation | Status |
@@ -78,7 +79,7 @@ mitigation: ✅ implemented and tested · 📐 designed · ⬜ planned.
 ### Supply chain and releases
 | Threat | Mitigation | Status |
 |--------|------------|--------|
-| T8 malicious or vulnerable dependency | Minimal, reviewed dependencies; pinned `Cargo.lock`; `cargo deny` (advisories, licenses, sources) in CI; Dependabot. | ✅ |
+| T8 malicious or vulnerable dependency | Minimal, reviewed dependencies; pinned `Cargo.lock` and `package-lock.json`; `cargo deny` (advisories, licenses, sources) in CI; npm install scripts disabled, exact versions at least two weeks old; Dependabot (npm with a two-week cooldown). | ✅ |
 | T8 compromised CI / update channel | Signed releases, signature verification before update, reproducible builds as a goal. | ⬜ Phase 8 |
 
 ## 5. Accepted residual risks and limitations

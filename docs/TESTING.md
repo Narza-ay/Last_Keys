@@ -31,6 +31,15 @@ docker build -f infra/Dockerfile -t lastkeys/server:local .
 LK_BIN=target/release/lk scripts/compose-smoke-test.sh
 ```
 
+Desktop application (see also [apps/desktop/README.md](../apps/desktop/README.md)):
+
+```bash
+cd apps/desktop
+npm ci && npm run lint && npm run typecheck && npm test && npm run test:e2e
+npx tauri build --debug --no-bundle
+LK_E2E_SERVER=http://127.0.0.1:18090 xvfb-run -a node e2e-tauri/run.mjs   # server optional
+```
+
 Fuzzing (nightly toolchain and `cargo install cargo-fuzz`):
 
 ```bash
@@ -46,7 +55,7 @@ KDF benchmark (always in release mode, on the device being measured):
 cargo run --release -p lk-crypto --example kdf_bench
 ```
 
-## Test inventory (M3)
+## Test inventory (M4)
 
 | Crate | Suites | Tests | What it covers |
 |-------|--------|-------|----------------|
@@ -62,10 +71,15 @@ cargo run --release -p lk-crypto --example kdf_bench
 | `lk-sync` | unit (4) | 4 | Server URL policy (HTTPS only, plain HTTP only to the local machine), conflict copies marked and bounded in size, content comparison and content digest ignoring the modification time only |
 | `lk-cli` | unit (1), end to end (6) | 7 | Real binary: full workflow (add/list/search/show/reveal/TOTP/edit/history/restore/delete/info), wrong password, recovery-key password reset and rotation, init guards, secrets refused as arguments, generator, item references |
 | `lk-cli` (feature `server-e2e`) | sync end to end (2) | 2 | Real binary against an in-process server on PostgreSQL: registration (wrong recovery key refused), enrollment of a second device with e-mail + master password, edits propagated with password history, `devices`, `revoke` (revoked device locked out), password change and recovery-key reset updating the server credential, `sync --reset` against a healthy server changes nothing, third device enrolled with the reset password; plain HTTP to a remote host refused |
+| `lk-client` | unit (1), vault (9) | 10 | Application layer: create/lock/unlock with password and recovery key, master password rules, edit drafts (keep/set/clear, history on replaced or removed passwords, kept custom fields and documents need their source, type changes refused, validation), **serialized views contain no secret**, explicit field access, TOTP (RFC 6238 vector), cards and identities, search never over secrets, references, local password change and recovery rotation, server operations refused before registration; every error code listed once |
+| `lk-desktop` | unit (9) | 9 | Desktop back end without a window: onboarding rules, lock/unlock, **auto-lock after inactivity**, **clipboard cleared after the delay only if it still holds the secret, and on lock**, settings validation and persistence, re-authentication for sensitive operations (except after a recovery-key unlock), generator, items through drafts; every error code has an English translation in the UI |
+| Desktop UI, Vitest | catalogues (8), contrast (39), drafts (5), screens (5) | 57 | French and English define the same keys and placeholders, plural pairs, French typography; **WCAG AA contrast (4.5:1) of every text colour pair in both themes**; editor drafts never load secrets; unlock, recovery key, onboarding rules, reveal/hide, auto-lock screen |
+| Desktop UI, Playwright | `e2e/app.spec.ts` (10) | 10 | The built interface in Chromium with the scripted back end: first start to first item, password change and history restore, copy notice, search and filters, delete confirmation, generator options, language and theme switching, lock/unlock and auto-lock, device revocation, keyboard navigation |
+| Desktop application, WebDriver | `e2e-tauri/run.mjs` | 1 scenario (12 steps) | **The real application** (Rust back end + UI, WebKitGTK) driven through tauri-driver: onboarding with Argon2id, add a login, explicit reveal, **copy to the system clipboard and automatic clearing** (read back with xclip), **registration and synchronization with a real `lk-server` on PostgreSQL**, device list verified with the account key, **no plaintext in the vault database or WAL**, lock and wrong password, generator, restart with the item persisted and an automatic sync, settings persisted. Run on the debug build and on the release package installed from the `.deb` |
 | Compose smoke test | `scripts/compose-smoke-test.sh` | 1 scenario | Real images and Compose file: setup, all services healthy, HTTPS through Caddy, server runs as uid 10001, PostgreSQL not published; register + sync with the real `lk` binary; backup, one more change, destruction of every volume, restore of the older backup with `restore.sh`, sync refused until `lk sync --reset`, resynchronization uploading the missing item, enrollment of a new device that receives all items (**V-Y7**); canary item, master password and e-mail absent from a plain `pg_dump` and from the server logs (**V-Y1**) |
 | Fuzz | `fuzz/fuzz_targets/` | 5 targets | Parsers never panic; accepted envelopes and sealed messages are canonical; recovery keys and items re-encode identically |
 
-**Total: 223 tests** (221 in the default feature set + 2 behind `server-e2e`) plus the Compose smoke scenario. Server and end-to-end tests require `LK_TEST_DATABASE_URL`; in CI they run in the `server-tests` job, the smoke test in the `compose-smoke` job.
+**Total: 242 Rust tests** (240 in the default feature set + 2 behind `server-e2e`), **67 desktop UI tests** (57 Vitest + 10 Playwright), the real-application WebDriver scenario and the Compose smoke scenario. Server and end-to-end tests require `LK_TEST_DATABASE_URL`; in CI they run in the `server-tests` job, the smoke test in `compose-smoke`, the UI tests in `desktop-ui`, the real application in `desktop-app`.
 
 ## Results — 2026-11-25, end of M3 (Linux x86_64, toolchain 1.97.0)
 

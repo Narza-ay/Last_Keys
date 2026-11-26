@@ -22,9 +22,9 @@ JavaScript heap cannot be zeroized.
 | Shared logic | New crate `lk-client`: the application layer (create, enroll, unlock, items, TOTP, account, sync, devices) used by the CLI and the desktop, and later by `lk-ffi` and `lk-wasm` |
 | UI | React 19.3 + TypeScript 6.0, built with Vite 8.3; no UI component library, no CSS framework, no web fonts (system font stack): fewer dependencies, offline, no third-party requests |
 | Clipboard | `arboard` 3.7, used from Rust only |
-| Tests | Rust unit and integration tests; Vitest 5.1 + Testing Library + jsdom for components; Playwright (pre-installed Chromium in development, `@playwright/test` in CI) against the built UI with a scripted back end; a smoke run of the real application on Linux |
-| Lint | ESLint 9 with typescript-eslint and the React plugins; `react/jsx-no-literals` forbids hard-coded UI text (criterion V-U1) |
-| Packages | npm with a committed `package-lock.json`, `npm ci`, install scripts disabled (`ignore-scripts=true`); every version pinned exactly and at least two weeks old when adopted |
+| Tests | Rust unit and integration tests; Vitest 5.1 + Testing Library + jsdom for components; Playwright 1.63 against the UI with a scripted back end (bundled only when `VITE_LK_MOCK=1`); the real application driven through WebDriver (tauri-driver 2.1 + WebKitWebDriver) on Linux |
+| Lint | ESLint 10 with typescript-eslint and the React hooks rules; a `no-restricted-syntax` rule forbids letters in JSX text and in user-facing attributes, i.e. hard-coded UI text (criterion V-U1) (`eslint-plugin-react` does not support ESLint 10 yet) |
+| Packages | npm with a committed `package-lock.json`, `npm ci`, install scripts disabled (`ignore-scripts=true`); every version pinned exactly and at least two weeks old when adopted; `legacy-peer-deps` because npm's resolver fails on Vitest's optional peers — every required peer is declared explicitly and `npm ls` checks the tree in CI |
 
 React is chosen over other front-end frameworks because the web application
 (spec §4) uses it: one UI skill set, and components can later be shared.

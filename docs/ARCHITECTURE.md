@@ -60,6 +60,7 @@ fuzz/                 ✅ libFuzzer targets (nightly)
 apps/
   cli/                ✅ `lk` command-line client (local vault + synchronization)
   server/             ✅ synchronization server (axum, PostgreSQL)
+  desktop/            ✅ desktop application (Tauri 2, React)
   …                   ⬜ other applications, each with a status README
 infra/                ✅ Docker image, Compose stack, setup/backup/restore scripts
 scripts/              ✅ CI helpers (advisory guard, Compose smoke test)
@@ -89,7 +90,7 @@ docs/                 specification, architecture, security, ADRs, audit
 |-------------|-----------|-------|--------|
 | `apps/cli` | M2, M3 | Rust (`lk` command) for end-to-end verification and power users | ✅ |
 | `apps/server` | M3 | Rust (axum), PostgreSQL, REST (WebSocket later), Docker Compose | ✅ |
-| `apps/desktop` | M4 | Tauri 2 + TypeScript | 📐 |
+| `apps/desktop` | M4 | Tauri 2 (Rust back end `lk-desktop` on `lk-client`) + React/TypeScript UI ([ADR-0010](adr/0010-desktop-application.md)) | ✅ |
 | `apps/extension` | M5 | TypeScript, MV3, `lk-wasm` | 📐 |
 | `apps/web` | Phase 6 | React + TypeScript + `lk-wasm` | 📐 |
 | `apps/android` | Phase 6 | Kotlin + `lk-ffi` | 📐 |

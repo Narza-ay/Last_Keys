@@ -13,3 +13,11 @@ updates:
     directory: "/infra"
     schedule:
       interval: weekly
+  - package-ecosystem: npm
+    directory: "/apps/desktop"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    # Releases younger than two weeks are not proposed (ADR-0010).
+    cooldown:
+      default-days: 14

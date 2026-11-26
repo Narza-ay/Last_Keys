@@ -150,22 +150,22 @@ marked ✅ are already met (with the evidence named); the others are targets.
 
 ### 3.4 Clients and autofill (Phase 6)
 
-| ID | Criterion |
-|----|-----------|
-| V-A1 | Domain matching: test suite with the Public Suffix List, IDN/punycode homographs, subdomains, ports and schemes; never fills an origin that does not match. |
-| V-A2 | Never fills into a cross-origin frame without explicit confirmation. |
-| V-A3 | Each browser (Chrome, Firefox, Brave) and OS has an automated end-to-end autofill test plus a documented manual matrix. |
-| V-A4 | Auto-lock: inactivity timeout, app exit and (where observable) system lock/sleep verified per platform. |
-| V-A5 | Hardware protection is reported only when the platform attests it (Android Keystore/StrongBox, Secure Enclave, TPM/Windows Hello). |
+| ID | Criterion | Status |
+|----|-----------|--------|
+| V-A1 | Domain matching: test suite with the Public Suffix List, IDN/punycode homographs, subdomains, ports and schemes; never fills an origin that does not match. | ⬜ M5 |
+| V-A2 | Never fills into a cross-origin frame without explicit confirmation. | ⬜ M5 |
+| V-A3 | Each browser (Chrome, Firefox, Brave) and OS has an automated end-to-end autofill test plus a documented manual matrix. | ⬜ M5 |
+| V-A4 | Auto-lock: inactivity timeout, app exit and (where observable) system lock/sleep verified per platform. | ⬜ partial: desktop inactivity timeout (Rust timer, unit-tested; UI notice tested) and lock on exit; system lock/sleep pending; other platforms later |
+| V-A5 | Hardware protection is reported only when the platform attests it (Android Keystore/StrongBox, Secure Enclave, TPM/Windows Hello). | ✅ desktop: shows "software" protection and claims no hardware protection; re-check when M7 adds key stores |
 
 ### 3.5 User interface
 
-| ID | Criterion |
-|----|-----------|
-| V-U1 | French and English complete; no hard-coded strings (lint). |
-| V-U2 | WCAG 2.2 AA: contrast, keyboard navigation, screen-reader labels (automated + manual audit). |
-| V-U3 | Light, dark and system themes; layouts verified at phone, tablet and desktop widths. |
-| V-U4 | Disabled or unsupported features are visibly marked as such. |
+| ID | Criterion | Status |
+|----|-----------|--------|
+| V-U1 | French and English complete; no hard-coded strings (lint). | ✅ desktop: one catalogue per language, identical keys enforced by the compiler, placeholders and plurals tested, lint rule refusing text in JSX and user-facing attributes, every back-end error code translated (Rust test) |
+| V-U2 | WCAG 2.2 AA: contrast, keyboard navigation, screen-reader labels (automated + manual audit). | ⬜ partial (desktop): text contrast ≥ 4.5:1 in both themes (test), keyboard navigation and shortcuts, dialog focus trap, every control labelled (tests use accessible names); automated axe audit and manual screen-reader audit pending |
+| V-U3 | Light, dark and system themes; layouts verified at phone, tablet and desktop widths. | ⬜ partial: light/dark/system on desktop (tested), compact sidebar below 1000 px; phone and tablet layouts with the mobile and web apps |
+| V-U4 | Disabled or unsupported features are visibly marked as such. | ⬜ partial: the desktop shows no feature it does not have, marks local protection as software and disables recovery-key rotation when unlocked with the recovery key; review per platform as features diverge |
 
 ### 3.6 Performance
 

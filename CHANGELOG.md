@@ -6,6 +6,28 @@ semantic versioning once releases begin.
 
 ## [Unreleased]
 
+### Added — M4: desktop application (2026-11-26)
+- ADR-0010: desktop stack (Tauri 2.12, React 19.3, TypeScript 6.0, Vite 8.3,
+  no UI library) and security model (secrets stay in Rust, views with
+  presence flags, explicit reveal, copy from Rust, edits as secret changes,
+  strict CSP, no plugin for the web view).
+- `lk-client`: application layer shared by every client (vault lifecycle,
+  items through edit drafts, views without secrets, TOTP, account, sync,
+  devices, stable error codes); the `lk` CLI now uses it.
+- `apps/desktop`: Tauri back end `lk-desktop` (commands on blocking
+  threads, auto-lock after inactivity, clipboard cleared after a delay and on
+  lock and exit, excluded from clipboard history, settings) and React UI in
+  French and English with light/dark/system themes: onboarding, unlock and
+  recovery, vault list with search and filters, item details with TOTP and
+  password history, editors for logins, notes, cards and identities,
+  generator, devices, settings, sync status and restore handling.
+- Tests: Rust back-end tests, Vitest (catalogues, WCAG contrast, drafts,
+  screens), Playwright, and a WebDriver test of the real application with a
+  real server; CI jobs `desktop-ui`, `desktop-app`, `desktop-bundle`.
+- Licence policy: MPL-2.0 (unmodified Tauri dependencies, listed in
+  NOTICE), BSL-1.0 and the LLVM exception accepted; Dependabot for npm with
+  a two-week cooldown.
+
 ### Added — M3: server and synchronization (2026-11-25)
 - ADR-0005 accepted (OPAQUE), ADR-0008 (sync protocol, amended with the
   restore procedure), ADR-0009 (server stack); AUDIT decisions 3 and 5

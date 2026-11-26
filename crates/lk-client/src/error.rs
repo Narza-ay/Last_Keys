@@ -186,6 +186,72 @@ pub enum ErrorKind {
     Internal,
 }
 
+impl ErrorKind {
+    /// Every code, for user interfaces that must translate them all.
+    pub const ALL: &'static [Self] = &[
+        Self::NoVault,
+        Self::VaultExists,
+        Self::InvalidCredentials,
+        Self::WeakMasterPassword,
+        Self::PasswordMismatch,
+        Self::NotFound,
+        Self::Ambiguous,
+        Self::InvalidInput,
+        Self::NotRegistered,
+        Self::AlreadyRegistered,
+        Self::NeedsMasterPassword,
+        Self::NoVaultOnServer,
+        Self::UntrustedDeviceList,
+        Self::CannotRevokeSelf,
+        Self::NoTotp,
+        Self::WrongItemType,
+        Self::ServerRollback,
+        Self::DeviceRevoked,
+        Self::Network,
+        Self::InvalidServerUrl,
+        Self::EmailTaken,
+        Self::RegistrationClosed,
+        Self::RateLimited,
+        Self::Server,
+        Self::Corrupted,
+        Self::Internal,
+    ];
+
+    /// Position in [`Self::ALL`]. The exhaustive `match` makes adding a
+    /// variant without listing it a compile error.
+    #[must_use]
+    pub const fn index(self) -> usize {
+        match self {
+            Self::NoVault => 0,
+            Self::VaultExists => 1,
+            Self::InvalidCredentials => 2,
+            Self::WeakMasterPassword => 3,
+            Self::PasswordMismatch => 4,
+            Self::NotFound => 5,
+            Self::Ambiguous => 6,
+            Self::InvalidInput => 7,
+            Self::NotRegistered => 8,
+            Self::AlreadyRegistered => 9,
+            Self::NeedsMasterPassword => 10,
+            Self::NoVaultOnServer => 11,
+            Self::UntrustedDeviceList => 12,
+            Self::CannotRevokeSelf => 13,
+            Self::NoTotp => 14,
+            Self::WrongItemType => 15,
+            Self::ServerRollback => 16,
+            Self::DeviceRevoked => 17,
+            Self::Network => 18,
+            Self::InvalidServerUrl => 19,
+            Self::EmailTaken => 20,
+            Self::RegistrationClosed => 21,
+            Self::RateLimited => 22,
+            Self::Server => 23,
+            Self::Corrupted => 24,
+            Self::Internal => 25,
+        }
+    }
+}
+
 impl ClientError {
     /// Stable code of this error.
     #[must_use]
@@ -244,3 +310,15 @@ fn sync_kind(e: &SyncError) -> ErrorKind {
 
 /// Convenience result alias.
 pub type Result<T> = core::result::Result<T, ClientError>;
+
+#[cfg(test)]
+mod tests {
+    use super::ErrorKind;
+
+    #[test]
+    fn all_lists_every_kind_once_in_order() {
+        for (i, kind) in ErrorKind::ALL.iter().enumerate() {
+            assert_eq!(kind.index(), i, "{kind:?}");
+        }
+    }
+}

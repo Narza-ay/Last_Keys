@@ -1,6 +1,6 @@
 # Roadmap
 
-Updated after every milestone. Last update: **2026-11-25 — M3 completed.**
+Updated after every milestone. Last update: **2026-11-26 — M4 completed.**
 
 The specification defines 8 phases (spec §18). At the owner's request the
 product is delivered **MVP-first**: milestones cut a vertical slice through
@@ -29,7 +29,7 @@ monitoring, P2P sync, documents/attachments, web application, telemetry.
 | M1 | Cryptographic core: KDF, envelopes, HPKE, signatures, recovery key, key hierarchy, device identities, certificates, revocation, trusted-device transfer | 2 | ✅ Done |
 | M2 | Vault model (logins, notes, cards, identities, TOTP), password/passphrase generator, local encrypted store (SQLite) with offline queue, `lk` CLI for end-to-end verification, HPKE cross-implementation vector | 2, 4 | ✅ Done (KDF device campaign carried over: needs physical devices) |
 | M3 | Server: OPAQUE authentication, device registry, encrypted sync with change log and conflict handling, revocation enforcement, PostgreSQL, Docker Compose self-hosting, backup/restore | 3 | ✅ Done (phase gate partial: V-Y2, V-Y3, V-Y5, V-Y7 carried over, see the log) |
-| M4 | Desktop app (Tauri 2): unlock, vault browsing/editing, generator, TOTP, devices, settings, FR/EN, light/dark/system | 6 | ⬜ |
+| M4 | Desktop app (Tauri 2): unlock, vault browsing/editing, generator, TOTP, devices, settings, FR/EN, light/dark/system | 6 | ✅ Done (Linux tested end to end; Windows/macOS built by CI, not yet run on devices) |
 | M5 | Browser extension (Chrome, Brave, Firefox): login-form detection, safe domain matching, fill, save, generate | 6 | ⬜ |
 | M6 | NordPass importer (local file, preview, duplicates, report) | 4 | ⬜ |
 | **v0.1** | **MVP release candidate**: regression suite, security review of M1–M6, deployment docs | 8 (partial) | ⬜ |
@@ -104,3 +104,26 @@ Carried over (tracked in [AUDIT.md §3.3](docs/AUDIT.md#33-server-and-synchroniz
 Remaining risks: RUSTSEC-2026-0387 accepted as unlinked (guarded in CI) until
 `opaque-ke` 5 is stable; the sync engine is exercised by deterministic
 scenarios only until the V-Y3 simulation exists.
+
+### M4 — 2026-11-26
+Owner validated M4. Delivered: ADR-0010 (desktop stack and security model),
+`lk-client` (application layer shared by the CLI and the desktop; the CLI
+now runs on it), the desktop application (`apps/desktop`): Rust back end
+(`lk-desktop`: commands, auto-lock, clipboard clearing, settings) and a
+React interface in French and English with light, dark and system themes —
+onboarding (new vault or new device), unlock (password or recovery key),
+logins with TOTP, notes, cards, identities, editor that never loads secrets,
+explicit reveal, generator, password history, registration and automatic
+synchronization, full resynchronization, devices and revocation, settings.
+Tests: 19 new Rust tests, 57 Vitest tests (including WCAG contrast of every
+text colour), 10 Playwright tests, and a WebDriver scenario of the real
+application on Linux (clipboard clearing, sync with a real server, no
+plaintext on disk) passing on the debug build and the installed `.deb`.
+Linux installers (deb, rpm, AppImage) built locally; CI builds installers
+for the three systems.
+
+Carried over: run the Windows and macOS builds on real devices; lock on
+system sleep/session lock (V-A4); automated accessibility audit (V-U2);
+network calls outside the vault lock; signed installers and updates
+(Phase 8); bundle identifier to confirm with the product domain.
+Next: M5 (browser extension with autofill).

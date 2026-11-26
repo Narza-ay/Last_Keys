@@ -6,12 +6,12 @@ Last Keys is a premium, cross-platform password manager and digital identity
 vault with end-to-end encryption, independent device identities, offline use,
 cloud, self-hosted and peer-to-peer synchronization.
 
-> **Project status — milestone M3 (2026-11-25).** The cryptographic core,
-> the vault model, the local encrypted store, the synchronization server
-> (self-hostable with Docker Compose) and the `lk` command-line client work
-> end to end across several devices. There is **no graphical application
-> yet**. See the [roadmap](ROADMAP.md) for what comes next and
-> [known limitations](docs/KNOWN_LIMITATIONS.md) for what does not work.
+> **Project status — milestone M4 (2026-11-26).** The cryptographic core,
+> the synchronization server (self-hostable with Docker Compose), the `lk`
+> command-line client and the **desktop application** (Tauri, French and
+> English) work end to end. The desktop app is tested on Linux; Windows and
+> macOS installers are built by CI but not yet tested on real machines. See
+> the [roadmap](ROADMAP.md) and the [known limitations](docs/KNOWN_LIMITATIONS.md).
 
 ## What exists today
 
@@ -27,9 +27,11 @@ cloud, self-hosted and peer-to-peer synchronization.
 | `crates/lk-sync` — client synchronization engine (conflict copies, rollback detection) | ✅ implemented, tested against the real server |
 | `apps/server` — synchronization server (axum, PostgreSQL 16) | ✅ implemented, tested against PostgreSQL |
 | `infra/` — Docker Compose self-hosting (Caddy TLS, backup/restore) | ✅ verified by an end-to-end smoke test in CI |
+| `crates/lk-client` — application layer shared by every client | ✅ implemented, tested |
+| `apps/desktop` — desktop application (Tauri 2, React), FR/EN, light/dark themes | ✅ Linux tested end to end; Windows/macOS built by CI |
 | `apps/cli` — `lk` command-line client (local vault and synchronization) | ✅ implemented, tested end to end |
-| CI: format, Clippy, tests on Linux/Windows/macOS, server tests on PostgreSQL, Compose smoke test, WebAssembly check, dependency policy, docs, nightly fuzzing | ✅ configured |
-| Desktop, browser extension, mobile, web | ⬜ not started — see [`apps/`](apps) |
+| CI: format, Clippy, tests on Linux/Windows/macOS, server tests on PostgreSQL, Compose smoke test, desktop UI and real-app tests, desktop installers, WebAssembly check, dependency policy, docs, nightly fuzzing | ✅ configured |
+| Browser extension, mobile, web | ⬜ not started — see [`apps/`](apps) |
 
 ## Build and test
 

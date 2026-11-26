@@ -1,7 +1,7 @@
 # Deployment
 
 **Status: the synchronization server is deployable by self-hosters (M3).**
-There is no official cloud deployment and no client installer yet.
+There is no official cloud deployment yet; desktop installers are built by CI, unsigned.
 
 * Self-hosting with Docker Compose: [SELF_HOSTING.md](SELF_HOSTING.md).
 * Server image: built from `infra/Dockerfile` (multi-stage, Rust 1.97.0 on
@@ -18,8 +18,11 @@ There is no official cloud deployment and no client installer yet.
 | Job | What it checks |
 |-----|----------------|
 | `lint` | `cargo fmt --check`, `cargo clippy -D warnings` (all targets, all features) |
-| `test` | `cargo test --workspace` (dev and release profiles, server excluded) on Linux, Windows and macOS; `cargo check` of the server |
+| `test` | `cargo test --workspace` (dev and release profiles, server excluded: it needs PostgreSQL) on Linux, Windows and macOS, desktop back end included |
 | `server-tests` | Server, synchronization and CLI end-to-end tests against a PostgreSQL 16 service |
+| `desktop-ui` | Desktop interface: `npm ls` (peers), ESLint (including the no-hard-coded-text rule), TypeScript, Vitest, production build, Playwright in Chromium |
+| `desktop-app` | The real desktop application on Linux through WebDriver, with a real `lk-server` on PostgreSQL |
+| `desktop-bundle` | Unsigned installers on Linux (deb, rpm, AppImage), Windows (MSI, NSIS) and macOS (app, DMG), kept 7 days as artifacts |
 | `compose-smoke` | Builds the server image and the `lk` binary, then runs `scripts/compose-smoke-test.sh`: the real Compose stack with TLS, registration, synchronization, backup, volume destruction, restore and enrollment of a new device |
 | `wasm` | `cargo check` of the portable crates for `wasm32-unknown-unknown` |
 | `deny` | `cargo deny check` (advisories, licenses, bans, sources) |
@@ -27,8 +30,9 @@ There is no official cloud deployment and no client installer yet.
 | `docs` | `cargo doc` with warnings denied |
 
 `.github/workflows/fuzz.yml` runs every fuzz target nightly (and on demand).
-Dependabot watches Cargo dependencies, GitHub Actions and the Docker base
-images of `infra/`.
+Dependabot watches Cargo dependencies, GitHub Actions, the Docker base
+images of `infra/` and the npm packages of `apps/desktop` (releases younger
+than two weeks are not proposed).
 
 ## Planned
 
@@ -36,7 +40,8 @@ images of `infra/`.
   operational runbook, monitoring and alerting (before any public beta).
 * Multi-architecture images (`linux/arm64`) and signed images published to a
   registry with an SBOM.
-* M4–M5: desktop installers (signed MSI/MSIX, notarized DMG, AppImage/deb/rpm),
-  extension packages for the Chrome Web Store, AMO and Brave.
+* Desktop installers are built unsigned by CI (M4); signing (Authenticode,
+  Apple notarization), MSIX and distribution channels come with the release
+  pipeline. M5: extension packages for the Chrome Web Store, AMO and Brave.
 * Phase 8: signed releases, update mechanism with signature verification,
   reproducible builds as a goal.

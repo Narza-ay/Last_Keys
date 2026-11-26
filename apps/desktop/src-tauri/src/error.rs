@@ -55,3 +55,35 @@ impl From<lk_generator::GeneratorError> for UiError {
 
 /// Result alias of the desktop back end.
 pub type UiResult<T> = Result<T, UiError>;
+
+#[cfg(test)]
+mod tests {
+    /// Codes produced by the desktop back end itself.
+    const DESKTOP_KINDS: &[&str] = &[
+        "locked",
+        "invalid_setting",
+        "clipboard",
+        "internal",
+        "invalid_input",
+        "invalid_recovery_key",
+    ];
+
+    #[test]
+    fn every_error_code_is_translated_by_the_ui() {
+        let catalogue = include_str!("../../src/i18n/en.ts");
+        let mut kinds: Vec<String> = lk_client::ErrorKind::ALL
+            .iter()
+            .map(|k| match serde_json::to_value(k) {
+                Ok(serde_json::Value::String(s)) => s,
+                other => panic!("unexpected serialization {other:?}"),
+            })
+            .collect();
+        kinds.extend(DESKTOP_KINDS.iter().map(|k| (*k).to_owned()));
+        for kind in kinds {
+            assert!(
+                catalogue.contains(&format!("\"error.{kind}\":")),
+                "no translation for error code {kind}"
+            );
+        }
+    }
+}
