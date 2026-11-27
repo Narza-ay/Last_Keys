@@ -89,7 +89,7 @@ rusqlite = { version = "0.43.0", default-features = false, features = ["bundled"
 
 # Desktop only (ADR-0010)
 tauri = { version = "=2.12.5" }
-tauri-build = { version = "=2.7.4" }
+tauri-build = { version = "=2.7.6" }
 arboard = { version = "3.7.0", default-features = false }
 # Per-user directories (already used by Tauri); the browser bridge needs them
 # before Tauri starts (relay mode, ADR-0011).
