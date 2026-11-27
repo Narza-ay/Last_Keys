@@ -41,11 +41,12 @@ distributions (glibc-based x86_64 and arm64 first).
 
 | Target | Status | Evidence |
 |--------|--------|----------|
-| Chromium on Linux x86_64 (the Chrome for Testing build of Playwright 1.63), desktop application on X11 | ✅ | `e2e/run.mjs`: the real desktop application registers the native host, the browser starts the relay; pairing, fill, refusal on another site, cross-origin frame confirmation, generate, save into the vault, lock, revocation |
+| Chromium on Linux x86_64 (the Chrome for Testing build of Playwright 1.63), desktop application on X11 | ✅ | `e2e/run.mjs`, locally and in CI (`desktop-app`, first green in run 47, commit `8b592e3`): the real desktop application registers the native host, the browser starts the relay; pairing, fill, refusal on another site, cross-origin frame confirmation, generate, save into the vault, lock, revocation |
 | Google Chrome (Linux, Windows, macOS) | ⬜ | Same build as Chromium (`dist/chrome`); not tested |
 | Brave | ⬜ | Same build as Chromium; not tested |
 | Firefox 128+ | 🔧 | `dist/firefox` built by CI, covered by unit tests and manifest checks; not loaded in Firefox by a test |
 | Native host registration, Linux | ✅ / 🔧 | Chromium directory exercised end to end; Chrome, Brave and Firefox directories unit-tested |
+| Desktop bridge (local endpoint, pairing, mutual authentication, requests, events, revocation) and the executable in relay mode, Windows and macOS | 🧪 | Integration tests over a real named pipe (`windows-latest`) and Unix socket (`macos-latest`) pass in CI (first green in run 47, commit `8b592e3`); no browser involved |
 | Native host registration, Windows (registry) and macOS | 🧪 | Compiled and unit-tested by CI; never run |
 | Browsers installed as Flatpak or Snap | ⛔ | Sandboxed browsers cannot start native messaging hosts |
 

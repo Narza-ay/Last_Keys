@@ -132,7 +132,8 @@ result). Not run yet: ⬜.
 | Desktop application, WebDriver, with a real server | 12/12 steps |
 | Extension: `npm ls`, ESLint, TypeScript, Vitest, Chromium and Firefox builds | pass (56 tests) |
 | Autofill end to end (desktop + Chromium + extension + native messaging) | 12/12 steps, run twice |
-| Compose smoke test | not rerun (server and infrastructure unchanged since M3) |
+| Compose smoke test | passed locally after making the Caddy health check wait (the server and infrastructure are unchanged since M3) |
+| CI run 47 (commit `8b592e3`) | all 16 jobs green: Rust tests on Linux, Windows (bridge over a named pipe, relay executable) and macOS, server tests, Compose smoke test, desktop UI, real desktop application, **autofill end to end with Chromium**, extension, installers for the three systems, WebAssembly, dependency policy, docs |
 
 ## Results — 2026-11-25, end of M3 (Linux x86_64, toolchain 1.97.0)
 
