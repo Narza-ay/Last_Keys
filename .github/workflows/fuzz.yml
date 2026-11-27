@@ -22,7 +22,7 @@ jobs:
       matrix:
         target: [envelope_parse, sealed_parse, recovery_parse, bundle_json, item_decode]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Install nightly and cargo-fuzz
         run: |
           rustup toolchain install nightly --profile minimal
