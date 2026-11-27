@@ -7,6 +7,7 @@ import { Button, Notice, PasswordField, Segmented, Select, TextField } from "../
 import { Dialog } from "../components/Dialog";
 import { useI18n } from "../i18n";
 import { useApp } from "../state/app";
+import { BrowserIntegration } from "./BrowserIntegration";
 import type { SyncControl } from "./Shell";
 
 function Row({ title, text, children }: { title: string; text?: string; children: ReactNode }) {
@@ -97,6 +98,9 @@ export function SettingsPage({ sync, onVaultChanged }: { sync: SyncControl; onVa
             />
           </Row>
         </div>
+
+        <div className="section-title">{t("browser.title")}</div>
+        <BrowserIntegration />
 
         <div className="section-title">{t("settings.account")}</div>
         <div className="card">

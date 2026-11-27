@@ -248,6 +248,45 @@ export interface Settings {
   theme: Theme;
   autoLockMinutes: number;
   clipboardClearSeconds: number;
+  /** Changed only through `setBrowserIntegration` (it registers browsers). */
+  browserIntegration: boolean;
+}
+
+// Browser integration (apps/desktop/src-tauri/src/bridge, ADR-0011).
+export type BrowserName = "chrome" | "chromium" | "brave" | "firefox";
+export type BrowserFamily = "chromium" | "firefox";
+export type InstallState = "installed" | "not_detected" | "not_installed" | "failed";
+
+export interface BrowserStatus {
+  browser: BrowserName;
+  state: InstallState;
+}
+
+export interface PairedClientView {
+  clientId: string;
+  name: string;
+  browser: BrowserFamily;
+  extension: string;
+  createdAt: number;
+  lastUsedAt: number | null;
+}
+
+export interface PairingRequestView {
+  id: number;
+  code: string;
+  clientName: string;
+  browser: BrowserFamily;
+  extension: string;
+}
+
+export interface BridgeStatus {
+  enabled: boolean;
+  running: boolean;
+  /** `in_use` (another instance serves it) or `unavailable`. */
+  error: string | null;
+  browsers: BrowserStatus[];
+  clients: PairedClientView[];
+  pending: PairingRequestView | null;
 }
 
 export interface PasswordOptions {

@@ -319,7 +319,7 @@ impl Vault {
 
     // ------------------------------------------------------------- items
 
-    fn decrypted(&self) -> Result<Vec<(StoredItem, ItemData)>> {
+    pub(crate) fn decrypted(&self) -> Result<Vec<(StoredItem, ItemData)>> {
         self.store
             .items(&self.vault.vault_id())?
             .into_iter()

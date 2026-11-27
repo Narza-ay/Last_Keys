@@ -95,6 +95,15 @@ pub enum ClientError {
     /// An edit request is inconsistent.
     #[error("invalid edit: {0}")]
     InvalidDraft(&'static str),
+    /// The page is not an `http` or `https` page.
+    #[error("this page cannot be filled")]
+    IneligiblePage,
+    /// The login does not belong to this page's site.
+    #[error("this login does not match the page")]
+    OriginMismatch,
+    /// Filling a frame of another origin needs the user's confirmation.
+    #[error("the form is in a frame of another origin; confirmation required")]
+    ConfirmationRequired,
     /// Synchronization or server error.
     #[error(transparent)]
     Sync(#[from] SyncError),
@@ -164,6 +173,12 @@ pub enum ErrorKind {
     NoTotp,
     /// Wrong item type.
     WrongItemType,
+    /// The page cannot be filled (not http or https).
+    IneligiblePage,
+    /// The login does not match the page.
+    OriginMismatch,
+    /// A cross-origin frame needs confirmation.
+    ConfirmationRequired,
     /// The server's data went back in time (restored backup or attack).
     ServerRollback,
     /// This device is revoked.
@@ -205,6 +220,9 @@ impl ErrorKind {
         Self::CannotRevokeSelf,
         Self::NoTotp,
         Self::WrongItemType,
+        Self::IneligiblePage,
+        Self::OriginMismatch,
+        Self::ConfirmationRequired,
         Self::ServerRollback,
         Self::DeviceRevoked,
         Self::Network,
@@ -238,16 +256,19 @@ impl ErrorKind {
             Self::CannotRevokeSelf => 13,
             Self::NoTotp => 14,
             Self::WrongItemType => 15,
-            Self::ServerRollback => 16,
-            Self::DeviceRevoked => 17,
-            Self::Network => 18,
-            Self::InvalidServerUrl => 19,
-            Self::EmailTaken => 20,
-            Self::RegistrationClosed => 21,
-            Self::RateLimited => 22,
-            Self::Server => 23,
-            Self::Corrupted => 24,
-            Self::Internal => 25,
+            Self::IneligiblePage => 16,
+            Self::OriginMismatch => 17,
+            Self::ConfirmationRequired => 18,
+            Self::ServerRollback => 19,
+            Self::DeviceRevoked => 20,
+            Self::Network => 21,
+            Self::InvalidServerUrl => 22,
+            Self::EmailTaken => 23,
+            Self::RegistrationClosed => 24,
+            Self::RateLimited => 25,
+            Self::Server => 26,
+            Self::Corrupted => 27,
+            Self::Internal => 28,
         }
     }
 }
@@ -277,6 +298,9 @@ impl ClientError {
             Self::CannotRevokeSelf => ErrorKind::CannotRevokeSelf,
             Self::NoTotp => ErrorKind::NoTotp,
             Self::WrongItemType => ErrorKind::WrongItemType,
+            Self::IneligiblePage => ErrorKind::IneligiblePage,
+            Self::OriginMismatch => ErrorKind::OriginMismatch,
+            Self::ConfirmationRequired => ErrorKind::ConfirmationRequired,
             Self::Sync(e) => sync_kind(e),
             Self::EmptyStore | Self::NoCertificate | Self::Store(_) | Self::Core(_) => {
                 ErrorKind::Corrupted

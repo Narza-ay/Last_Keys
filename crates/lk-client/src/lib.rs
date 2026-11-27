@@ -10,18 +10,21 @@
 //! secret values are replaced by presence flags, and edit requests
 //! ([`draft`]) in which secret fields are sent as changes. A secret value
 //! leaves this crate only through [`Vault::field_value`] (explicit reveal or
-//! copy) or [`Vault::item`] (clients that render secrets themselves).
+//! copy), [`Vault::item`] (clients that render secrets themselves) and the
+//! origin-checked autofill operations ([`autofill`]).
 //!
 //! Every function takes the current time as a parameter (Unix seconds), so
 //! that behaviour is deterministic and testable.
 
 #![forbid(unsafe_code)]
 
+pub mod autofill;
 pub mod draft;
 mod error;
 pub mod vault;
 pub mod view;
 
+pub use autofill::{AutofillCandidate, AutofillCredentials, FillTarget, SaveProposal};
 pub use draft::{
     ContentDraft, CustomFieldDraft, DocumentDraft, ItemDraft, ListChange, SecretChange,
 };
@@ -37,5 +40,6 @@ pub use view::{
 };
 
 /// Re-exported so that clients do not need a direct dependency for these.
+pub use lk_autofill::MatchKind;
 pub use lk_core::{DeviceId, ItemId, Platform};
 pub use lk_crypto::{MasterPassword, RecoveryKey, Zeroizing};

@@ -21,3 +21,9 @@ apps/desktop/dist/
 apps/desktop/test-results/
 apps/desktop/playwright-report/
 apps/desktop/src-tauri/gen/
+
+# Browser extension (generated)
+apps/extension/node_modules/
+apps/extension/dist/
+apps/extension/test-results/
+apps/extension/playwright-report/

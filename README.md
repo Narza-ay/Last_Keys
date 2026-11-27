@@ -28,10 +28,13 @@ cloud, self-hosted and peer-to-peer synchronization.
 | `apps/server` — synchronization server (axum, PostgreSQL 16) | ✅ implemented, tested against PostgreSQL |
 | `infra/` — Docker Compose self-hosting (Caddy TLS, backup/restore) | ✅ verified by an end-to-end smoke test in CI |
 | `crates/lk-client` — application layer shared by every client | ✅ implemented, tested |
-| `apps/desktop` — desktop application (Tauri 2, React), FR/EN, light/dark themes | ✅ Linux tested end to end; Windows/macOS built by CI |
+| `crates/lk-autofill` — which login may be used on which web page (Public Suffix List, punycode, ports) | ✅ implemented, tested |
+| `crates/lk-bridge` — browser bridge protocol: frames, pairing, mutual authentication, native messaging manifests | ✅ implemented, tested |
+| `apps/desktop` — desktop application (Tauri 2, React), FR/EN, light/dark themes, browser bridge | ✅ Linux tested end to end; Windows/macOS built by CI |
+| `apps/extension` — browser extension (Manifest V3, Chrome/Brave/Firefox) connected to the desktop application | ✅ Chromium on Linux tested end to end; Firefox built, not driven end to end |
 | `apps/cli` — `lk` command-line client (local vault and synchronization) | ✅ implemented, tested end to end |
-| CI: format, Clippy, tests on Linux/Windows/macOS, server tests on PostgreSQL, Compose smoke test, desktop UI and real-app tests, desktop installers, WebAssembly check, dependency policy, docs, nightly fuzzing | ✅ configured |
-| Browser extension, mobile, web | ⬜ not started — see [`apps/`](apps) |
+| CI: format, Clippy, tests on Linux/Windows/macOS, server tests on PostgreSQL, Compose smoke test, desktop UI and real-app tests, extension tests and builds, autofill end to end, desktop installers, WebAssembly check, dependency policy, docs, nightly fuzzing | ✅ configured |
+| Mobile, web | ⬜ not started — see [`apps/`](apps) |
 
 ## Build and test
 

@@ -9,6 +9,7 @@ publish.workspace = true
 
 [dependencies]
 lk-auth.workspace = true
+lk-autofill.workspace = true
 lk-core.workspace = true
 lk-crypto.workspace = true
 lk-protocol.workspace = true

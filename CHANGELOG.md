@@ -6,6 +6,43 @@ semantic versioning once releases begin.
 
 ## [Unreleased]
 
+### Added — M5: browser extension connected to the desktop (2026-11-27)
+- ADR-0011: the extension asks the running desktop application through
+  native messaging; no key, no decryption and no vault in the browser;
+  mutual authentication of every connection; access to every site optional
+  (AUDIT P-9).
+- `lk-autofill`: which stored URL may be used on which page (Public Suffix
+  List with private suffixes, punycode comparison, IP addresses and
+  localhost exact, ports, no https→http downgrade, no fuzzy matching).
+- `lk-client`: origin-checked autofill operations (candidates for a page,
+  credentials for a page and frame with cross-origin confirmation, copy of
+  login fields, save proposals, saving and password updates); error codes
+  `ineligible_page`, `origin_mismatch`, `confirmation_required`.
+- `lk-bridge`: frames, request types with limits, pairing codes, client IDs,
+  pairing keys and HMAC-SHA-256 proofs (known-answer vectors shared with the
+  extension), endpoint names, native messaging manifests and locations,
+  relay argument recognition.
+- Desktop: local endpoint (Unix socket in a `0700` directory, or named
+  pipe), pairing dialog with a code, browser integration settings
+  (registered browsers, paired extensions, revocation), relay mode of the
+  executable started by the browser, explicit extension actions counted as
+  activity, refresh and synchronization after a login is saved from the
+  browser.
+- `apps/extension`: Manifest V3 builds for Chromium (Chrome, Brave) and
+  Firefox, popup in French and English with the desktop's design tokens,
+  form detection (login, two-step, registration, password change, one-time
+  codes; hidden fields ignored), fill on user action only, confirmation for
+  frames of another origin, copy through the desktop, save and update
+  proposals with a toolbar badge, password generation, optional access to
+  every site with click-to-fill fallback.
+- Tests: Rust (matching matrix, autofill operations, bridge protocol over a
+  real socket, the executable in relay mode), Vitest (detection, filling,
+  capture, session and protocol against a scripted desktop, router, popup,
+  manifests, translations), and an end-to-end test with the real desktop
+  application, Chromium and the extension; CI job `extension`, autofill
+  scenario in `desktop-app`.
+- NOTICE: Public Suffix List (MPL-2.0).
+
 ### Added — M4: desktop application (2026-11-26)
 - ADR-0010: desktop stack (Tauri 2.12, React 19.3, TypeScript 6.0, Vite 8.3,
   no UI library) and security model (secrets stay in Rust, views with

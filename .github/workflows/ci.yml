@@ -124,6 +124,35 @@ jobs:
         run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
 
+  extension:
+    name: Browser extension (lint, types, unit tests, Chromium and Firefox builds)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/extension
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/extension/package-lock.json
+      - run: npm ci
+      - name: Every required peer dependency is declared
+        run: npm ls --all > /dev/null
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Keep the unpacked builds (Chrome/Brave, Firefox)
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-unpacked
+          path: |
+            apps/extension/dist/chrome
+            apps/extension/dist/firefox
+          retention-days: 7
+
   desktop-app:
     name: Desktop application end to end (real app and server, Linux, WebDriver)
     runs-on: ubuntu-latest
@@ -150,7 +179,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: apps/desktop/package-lock.json
+          cache-dependency-path: |
+            apps/desktop/package-lock.json
+            apps/extension/package-lock.json
       - name: Install WebKitGTK, its WebDriver, a virtual display and xclip
         run: |
           sudo apt-get update
@@ -178,6 +209,17 @@ jobs:
         env:
           LK_E2E_SERVER: http://127.0.0.1:18090
         run: xvfb-run -a node e2e-tauri/run.mjs
+      - name: Build the browser extension
+        working-directory: apps/extension
+        run: |
+          npm ci
+          npm run build
+      - name: Install the Chromium of the pinned Playwright
+        working-directory: apps/extension
+        run: npx playwright install --with-deps chromium
+      - name: Autofill end to end (real app, Chromium with the extension, native messaging)
+        working-directory: apps/extension
+        run: xvfb-run -a node e2e/run.mjs
 
   desktop-bundle:
     name: Desktop installers (${{ matrix.os }}, unsigned)
@@ -229,7 +271,7 @@ jobs:
           rustup toolchain install
           rustup target add wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
-      - run: cargo check -p lk-core -p lk-crypto -p lk-generator -p lk-totp --target wasm32-unknown-unknown --locked
+      - run: cargo check -p lk-core -p lk-crypto -p lk-generator -p lk-totp -p lk-autofill --target wasm32-unknown-unknown --locked
 
   deny:
     name: Dependency policy (cargo-deny)

@@ -18,5 +18,6 @@ Statuses: **Proposed** (awaiting owner approval) · **Accepted** · **Superseded
 | [0008](0008-sync-protocol.md) | Synchronization protocol v1 | Accepted |
 | [0009](0009-server-stack.md) | Server technology stack | Accepted |
 | [0010](0010-desktop-application.md) | Desktop application stack and security model | Accepted |
+| [0011](0011-browser-extension.md) | Browser extension connected to the desktop application | Accepted |
 
 Template: copy `0000-template.md`.

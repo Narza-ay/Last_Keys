@@ -194,6 +194,20 @@ export function Shell() {
     sync.schedule();
   }, [changed, sync]);
 
+  // A login saved from the browser extension: refresh and synchronize.
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void backend.onVaultChanged(localChange).then((fn) => {
+      if (disposed) fn();
+      else unlisten = fn;
+    });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [backend, localChange]);
+
   return (
     <div className="shell">
       <nav className="sidebar" aria-label={t("nav.label")}>

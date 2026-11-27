@@ -11,6 +11,8 @@ members = [
   "crates/lk-protocol",
   "crates/lk-sync",
   "crates/lk-client",
+  "crates/lk-autofill",
+  "crates/lk-bridge",
   "apps/cli",
   "apps/server",
   "apps/desktop/src-tauri",
@@ -41,6 +43,8 @@ lk-auth = { path = "crates/lk-auth" }
 lk-protocol = { path = "crates/lk-protocol" }
 lk-sync = { path = "crates/lk-sync" }
 lk-client = { path = "crates/lk-client" }
+lk-autofill = { path = "crates/lk-autofill" }
+lk-bridge = { path = "crates/lk-bridge" }
 
 # Cryptography (RustCrypto / dalek / rust-hpke). No custom primitives.
 argon2 = { version = "0.6.0", default-features = false, features = ["alloc", "zeroize"] }
@@ -68,6 +72,10 @@ data-encoding = { version = "2.11.1", default-features = false, features = ["all
 unicode-normalization = { version = "0.1.26", default-features = false }
 url = { version = "2.5.9" }
 percent-encoding = { version = "2.3.2" }
+# Public Suffix List compiled into code (list data under MPL-2.0, see NOTICE);
+# pinned exactly: each release embeds a new snapshot of the list.
+psl = { version = "=2.1.252" }
+idna = { version = "1.1.0" }
 
 # General
 thiserror = { version = "2.0.21", default-features = false }
@@ -83,6 +91,9 @@ rusqlite = { version = "0.43.0", default-features = false, features = ["bundled"
 tauri = { version = "=2.12.5" }
 tauri-build = { version = "=2.7.4" }
 arboard = { version = "3.7.0", default-features = false }
+# Per-user directories (already used by Tauri); the browser bridge needs them
+# before Tauri starts (relay mode, ADR-0011).
+dirs = { version = "7.0.0" }
 
 # Server only (ADR-0009)
 tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "net", "signal", "time"] }

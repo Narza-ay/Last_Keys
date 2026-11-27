@@ -5,6 +5,14 @@
 #![forbid(unsafe_code)]
 
 fn main() -> std::process::ExitCode {
+    // Started by a browser as its native messaging host: relay only, no
+    // window (ADR-0011).
+    let args: Vec<String> = std::env::args_os()
+        .map(|a| a.to_string_lossy().into_owned())
+        .collect();
+    if let Some(caller) = lk_bridge::caller_from_args(&args) {
+        return lk_desktop::bridge::relay::run(&caller);
+    }
     match lk_desktop::run() {
         Ok(()) => std::process::ExitCode::SUCCESS,
         Err(e) => {

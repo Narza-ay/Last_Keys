@@ -1,0 +1,21 @@
+[package]
+name = "lk-autofill"
+description = "Last Keys autofill policy: which stored logins may be offered and filled on which web origin."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+url.workspace = true
+psl.workspace = true
+idna.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+serde_json = { workspace = true, features = ["std"] }
+
+[lints]
+workspace = true

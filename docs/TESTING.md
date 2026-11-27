@@ -7,7 +7,7 @@ cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo test --workspace --locked --exclude lk-server             # dev profile (dependencies optimized)
 cargo test --workspace --locked --exclude lk-server --release   # production profile (panic = abort)
-cargo check -p lk-core -p lk-crypto -p lk-generator -p lk-totp --target wasm32-unknown-unknown --locked
+cargo check -p lk-core -p lk-crypto -p lk-generator -p lk-totp -p lk-autofill --target wasm32-unknown-unknown --locked
 cargo deny check
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked --document-private-items
 ```
@@ -40,6 +40,19 @@ npx tauri build --debug --no-bundle
 LK_E2E_SERVER=http://127.0.0.1:18090 xvfb-run -a node e2e-tauri/run.mjs   # server optional
 ```
 
+`cargo test` rebuilds `target/debug/last-keys` without the embedded
+interface (it then loads the development server): run `npx tauri build
+--debug --no-bundle` again before the WebDriver scenarios.
+
+Browser extension (see also [apps/extension/README.md](../apps/extension/README.md)):
+
+```bash
+cd apps/extension
+npm ci && npm run lint && npm run typecheck && npm test
+LK_EXTENSION_E2E=1 npm run build            # dist/chrome, dist/firefox, dist/chrome-e2e
+xvfb-run -a node e2e/run.mjs                # needs the desktop build above
+```
+
 Fuzzing (nightly toolchain and `cargo install cargo-fuzz`):
 
 ```bash
@@ -55,7 +68,7 @@ KDF benchmark (always in release mode, on the device being measured):
 cargo run --release -p lk-crypto --example kdf_bench
 ```
 
-## Test inventory (M4)
+## Test inventory (M5)
 
 | Crate | Suites | Tests | What it covers |
 |-------|--------|-------|----------------|
@@ -71,15 +84,55 @@ cargo run --release -p lk-crypto --example kdf_bench
 | `lk-sync` | unit (4) | 4 | Server URL policy (HTTPS only, plain HTTP only to the local machine), conflict copies marked and bounded in size, content comparison and content digest ignoring the modification time only |
 | `lk-cli` | unit (1), end to end (6) | 7 | Real binary: full workflow (add/list/search/show/reveal/TOTP/edit/history/restore/delete/info), wrong password, recovery-key password reset and rotation, init guards, secrets refused as arguments, generator, item references |
 | `lk-cli` (feature `server-e2e`) | sync end to end (2) | 2 | Real binary against an in-process server on PostgreSQL: registration (wrong recovery key refused), enrollment of a second device with e-mail + master password, edits propagated with password history, `devices`, `revoke` (revoked device locked out), password change and recovery-key reset updating the server credential, `sync --reset` against a healthy server changes nothing, third device enrolled with the reset password; plain HTTP to a remote host refused |
-| `lk-client` | unit (1), vault (9) | 10 | Application layer: create/lock/unlock with password and recovery key, master password rules, edit drafts (keep/set/clear, history on replaced or removed passwords, kept custom fields and documents need their source, type changes refused, validation), **serialized views contain no secret**, explicit field access, TOTP (RFC 6238 vector), cards and identities, search never over secrets, references, local password change and recovery rotation, server operations refused before registration; every error code listed once |
-| `lk-desktop` | unit (9) | 9 | Desktop back end without a window: onboarding rules, lock/unlock, **auto-lock after inactivity**, **clipboard cleared after the delay only if it still holds the secret, and on lock**, settings validation and persistence, re-authentication for sensitive operations (except after a recovery-key unlock), generator, items through drafts; every error code has an English translation in the UI |
-| Desktop UI, Vitest | catalogues (8), contrast (39), drafts (5), screens (5) | 57 | French and English define the same keys and placeholders, plural pairs, French typography; **WCAG AA contrast (4.5:1) of every text colour pair in both themes**; editor drafts never load secrets; unlock, recovery key, onboarding rules, reveal/hide, auto-lock screen |
+| `lk-autofill` | matching (9) | 9 | **V-A1**: exact host and same site, Public Suffix List ICANN and private sections (`alice.github.io` ≠ `bob.github.io`, `co.uk`), substring, suffix and user-info tricks, **look-alike Unicode domains never match** (punycode comparison, display in Unicode), IP addresses, IPv6, localhost and single-label hosts exact only, ports, **no https→http downgrade**, ineligible schemes (`file:`, `javascript:`, `data:`, browser and extension pages), stored URL and title for a saved login |
+| `lk-bridge` | unit (12) | 12 | Frames (round trip, empty, oversized announcements refused before allocation, truncation); every request parsed, malformed and oversized requests refused, secrets redacted in `Debug`; **HMAC proofs bound to every input and direction, known-answer vector computed with Python** (shared with the extension); pairing codes from the unambiguous alphabet; endpoint names (socket path, per-user pipe name, case-insensitive); native host manifests and per-browser locations on Linux, macOS and Windows; relay arguments of Chromium and Firefox recognised, anything else refused |
+| `lk-client` | unit (1), vault (9), autofill (7) | 17 | Autofill: candidates of a page only (look-alikes, other users' `github.io` sites, http pages excluded), ordering, **every fill re-checked against page and frame, frame of another origin needs confirmation, frame of another site refused even when confirmed**, copies limited to login fields of matching logins, save proposals (new, update, unchanged; case-insensitive usernames; a look-alike never updates the genuine login), saving with password history, updates refused for another site or username. Application layer: create/lock/unlock with password and recovery key, master password rules, edit drafts (keep/set/clear, history on replaced or removed passwords, kept custom fields and documents need their source, type changes refused, validation), **serialized views contain no secret**, explicit field access, TOTP (RFC 6238 vector), cards and identities, search never over secrets, references, local password change and recovery rotation, server operations refused before registration; every error code listed once |
+| `lk-desktop` | unit (15), bridge (6) | 21 | Desktop back end without a window: onboarding rules, lock/unlock, **auto-lock after inactivity**, **clipboard cleared after the delay only if it still holds the secret, and on lock**, settings validation and persistence, re-authentication for sensitive operations (except after a recovery-key unlock), generator, items through drafts; every error code has an English translation in the UI; paired-browser store (`0600` file, no key in listings, limit), pairing broker (one request, growing delay after refusals), native host installation per browser and removal of our files only, application identifier equal to the Tauri configuration. **Bridge over a real socket**: pairing with the same code in the dialog, mutual authentication, origin-checked list/fill/copy/save, cross-origin frame confirmation, lock and unlock events, revocation closing every session, nothing before the relay's announcement, requests before authentication refused, wrong or replayed proofs, malformed and oversized frames, refused and busy pairings, one server per endpoint and clean stop; **the real executable in relay mode** with native messaging framing, and its `desktop_unavailable` answer |
+| Desktop UI, Vitest | catalogues (8), contrast (39), drafts (5), screens (10) | 62 | French and English define the same keys and placeholders, plural pairs, French typography; **WCAG AA contrast (4.5:1) of every text colour pair in both themes**; editor drafts never load secrets; unlock, recovery key, onboarding rules, reveal/hide, auto-lock screen; browser integration (turn on, browsers, connected extensions, removal), pairing dialog with the code (closing refuses; shown over the unlock screen too), list refreshed after a login saved from the browser |
 | Desktop UI, Playwright | `e2e/app.spec.ts` (10) | 10 | The built interface in Chromium with the scripted back end: first start to first item, password change and history restore, copy notice, search and filters, delete confirmation, generator options, language and theme switching, lock/unlock and auto-lock, device revocation, keyboard navigation |
 | Desktop application, WebDriver | `e2e-tauri/run.mjs` | 1 scenario (12 steps) | **The real application** (Rust back end + UI, WebKitGTK) driven through tauri-driver: onboarding with Argon2id, add a login, explicit reveal, **copy to the system clipboard and automatic clearing** (read back with xclip), **registration and synchronization with a real `lk-server` on PostgreSQL**, device list verified with the account key, **no plaintext in the vault database or WAL**, lock and wrong password, generator, restart with the item persisted and an automatic sync, settings persisted. Run on the debug build and on the release package installed from the `.deb` |
+| Extension, Vitest | content (15), background (23), popup (15), manifests (3) | 56 | Form detection (login, two-step, registration, password change, one-time codes, forms without `<form>`) and **hidden, off-screen, disabled and read-only fields never used**; filling with input/change events; generated passwords only into new-password fields; capture on submit, submit button and Enter, once per submission; **authentication vectors shared with Rust**, non-extractable key; session against a scripted desktop computing proofs independently: mutual authentication, **no proof sent to an impostor**, lock events, unknown or revoked pairing forgotten, pairing approved or refused, reconnection, **no notification loop and the pairing connection kept while the popup asks for the state**; router: page view, top-frame fill, cross-origin confirmation, every frame checked, ineligible pages, save/update/unchanged, submissions while locked, expiry, **concurrent frame reports all kept**, generated password only for frames of the page's origin, access to every site reported; popup in every state, French, confirmation, copy, save, generate, host access proposal; manifests (least privilege, IDs equal to the native host's list) |
+| Autofill end to end | `apps/extension/e2e/run.mjs` | 1 scenario (12 steps) | **Real desktop application** (WebDriver) **+ Chromium with the extension** (Playwright) **+ native messaging** registered by the application: create a vault and a login, turn on browser integration (manifest written for Chromium), extension ID allowed by the host, **pairing with the same code in the popup and the desktop dialog**, fill into the page, **another site gets nothing**, **embedded form of another origin filled only after confirmation**, generated password into new-password fields, **submitted credentials saved into the desktop vault**, lock followed by the popup (no password field in the browser), revocation, no secret in the vault files |
 | Compose smoke test | `scripts/compose-smoke-test.sh` | 1 scenario | Real images and Compose file: setup, all services healthy, HTTPS through Caddy, server runs as uid 10001, PostgreSQL not published; register + sync with the real `lk` binary; backup, one more change, destruction of every volume, restore of the older backup with `restore.sh`, sync refused until `lk sync --reset`, resynchronization uploading the missing item, enrollment of a new device that receives all items (**V-Y7**); canary item, master password and e-mail absent from a plain `pg_dump` and from the server logs (**V-Y1**) |
 | Fuzz | `fuzz/fuzz_targets/` | 5 targets | Parsers never panic; accepted envelopes and sealed messages are canonical; recovery keys and items re-encode identically |
 
-**Total: 242 Rust tests** (240 in the default feature set + 2 behind `server-e2e`), **67 desktop UI tests** (57 Vitest + 10 Playwright), the real-application WebDriver scenario and the Compose smoke scenario. Server and end-to-end tests require `LK_TEST_DATABASE_URL`; in CI they run in the `server-tests` job, the smoke test in `compose-smoke`, the UI tests in `desktop-ui`, the real application in `desktop-app`.
+**Total: 282 Rust tests** (280 in the default feature set + 2 behind `server-e2e`), **72 desktop UI tests** (62 Vitest + 10 Playwright), **56 extension tests**, the real-application WebDriver scenario, the autofill end-to-end scenario and the Compose smoke scenario. Server and end-to-end tests require `LK_TEST_DATABASE_URL`; in CI they run in the `server-tests` job, the smoke test in `compose-smoke`, the UI tests in `desktop-ui`, the extension tests in `extension`, the real application and the autofill scenario in `desktop-app`.
+
+## Manual autofill matrix (criterion V-A3)
+
+Automated today: Chromium on Linux (above). Before v0.1, each cell below is
+run by hand with the published builds and recorded here (date, versions,
+result). Not run yet: ⬜.
+
+| Check | Chrome Linux | Chrome Windows | Chrome macOS | Brave (any) | Firefox Linux | Firefox Windows | Firefox macOS |
+|-------|--------------|----------------|--------------|-------------|---------------|-----------------|---------------|
+| Turning on browser integration registers the browser ("Ready") | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| Pairing: same code, approval in the desktop; refusal shown in the popup | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| Access to every site proposed; declining keeps click-to-fill working | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| Fill on a real login page (username + password), then the TOTP step | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| Look-alike domain and another site: nothing offered | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| Embedded login of another origin: confirmation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| Save after sign-up, update after a password change | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| Copy username/password/code, clipboard cleared by the desktop | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| Desktop locked: popup asks to unlock in the application | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| Desktop closed: popup says it is not reachable | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| Revocation in the desktop disconnects the extension | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+
+## Results — 2026-11-27, end of M5 (Linux x86_64, toolchain 1.97.0)
+
+| Check | Result |
+|-------|--------|
+| `cargo fmt --check`, `cargo clippy -D warnings` (all targets, all features) | pass |
+| `cargo test --workspace` with PostgreSQL 16 (dev profile) | 280 passed, 0 failed |
+| `cargo test --workspace --exclude lk-server --release` | 245 passed, 0 failed |
+| `cargo test -p lk-cli --features server-e2e --test sync_e2e` | 2 passed, 0 failed |
+| `cargo check` wasm32-unknown-unknown (adds `lk-autofill`) | pass (compile only) |
+| `cargo deny check`, `cargo doc -D warnings` | pass |
+| Desktop UI: ESLint, TypeScript, Vitest, build, Playwright | pass (62 + 10 tests) |
+| Desktop application, WebDriver, with a real server | 12/12 steps |
+| Extension: `npm ls`, ESLint, TypeScript, Vitest, Chromium and Firefox builds | pass (56 tests) |
+| Autofill end to end (desktop + Chromium + extension + native messaging) | 12/12 steps, run twice |
+| Compose smoke test | not rerun (server and infrastructure unchanged since M3) |
 
 ## Results — 2026-11-25, end of M3 (Linux x86_64, toolchain 1.97.0)
 
@@ -110,7 +163,7 @@ WebAssembly on a mid-range laptop, with memory ≥ 64 MiB.
 | Server vCPU, Intel Xeon 2.1 GHz (dev container), native | 126 ms | 145 ms | 147 ms | 311 ms | 728 ms |
 | Reference low-end Android 10 device | pending (needs the device) | | | | |
 | iPhone (iOS 17 minimum device) | pending (needs the device) | | | | |
-| Mid-range laptop, WASM in Chrome/Firefox | pending (browser harness, M4/M5) | | | | |
+| Mid-range laptop, WASM in Chrome/Firefox | pending (browser harness, M13) | | | | |
 
 Medians of 5 runs. The `argon2` crate computes lanes sequentially (the
 `parallel` feature is not enabled), so `p` changes the memory layout but not

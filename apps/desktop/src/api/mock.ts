@@ -3,11 +3,14 @@
 // the Rust semantics closely enough to exercise the UI (no cryptography).
 //
 // URL parameters: ?state=fresh|locked|unlocked (default fresh),
-// &registered=1, &lang=fr|en, &theme=light|dark.
+// &registered=1, &lang=fr|en, &theme=light|dark, &bridge=1 (browser
+// integration on, one paired extension), &pairing=1 (a pairing request is
+// waiting).
 
 import type { Backend } from "./backend";
 import type {
   AppStatus,
+  BridgeStatus,
   ContentView,
   DeviceView,
   Field,
@@ -15,6 +18,7 @@ import type {
   ItemKind,
   ItemSummary,
   ItemView,
+  PairingRequestView,
   SecretChange,
   Settings,
   SyncSummary,
@@ -332,8 +336,58 @@ export function createMockBackend(): Backend {
     theme: (params.get("theme") as Settings["theme"] | null) ?? "system",
     autoLockMinutes: 5,
     clipboardClearSeconds: 30,
+    browserIntegration: params.get("bridge") === "1",
   };
   const lockListeners = new Set<() => void>();
+  const changeListeners = new Set<() => void>();
+  const pairingListeners = new Set<(r: PairingRequestView) => void>();
+  const pairingClosedListeners = new Set<(id: number) => void>();
+  let pairingId = 0;
+  let pending: PairingRequestView | null = null;
+  let clients: BridgeStatus["clients"] = settings.browserIntegration
+    ? [
+        {
+          clientId: "00112233445566778899aabbccddeeff",
+          name: "Chrome · Linux",
+          browser: "chromium",
+          extension: "bblheiicocdmmkjnhdeehaedddgcfhok",
+          createdAt: now() - 7 * 86_400,
+          lastUsedAt: now() - 600,
+        },
+      ]
+    : [];
+  const bridge = (): BridgeStatus => ({
+    enabled: settings.browserIntegration,
+    running: settings.browserIntegration,
+    error: null,
+    browsers: settings.browserIntegration
+      ? [
+          { browser: "chrome", state: "installed" },
+          { browser: "chromium", state: "not_detected" },
+          { browser: "brave", state: "not_detected" },
+          { browser: "firefox", state: "installed" },
+        ]
+      : [
+          { browser: "chrome", state: "not_installed" },
+          { browser: "chromium", state: "not_detected" },
+          { browser: "brave", state: "not_detected" },
+          { browser: "firefox", state: "not_installed" },
+        ],
+    clients: clients.map((c) => ({ ...c })),
+    pending: pending ? { ...pending } : null,
+  });
+  const requestPairing = () => {
+    pending = {
+      id: ++pairingId,
+      code: "K7M-4QX",
+      clientName: "Firefox · Linux",
+      browser: "firefox",
+      extension: "browser-extension@lastkeys.app",
+    };
+    const request = pending;
+    pairingListeners.forEach((l) => l(request));
+  };
+  if (params.get("pairing") === "1") requestPairing();
   let deviceName = "Laptop";
   const devices: DeviceView[] = [
     { id: "d0000001-0000-4000-8000-000000000001", name: "Laptop", platform: "linux", status: "this_device", enrolledAt: now() - 60 * 86_400, lastSeen: now() },
@@ -365,7 +419,7 @@ export function createMockBackend(): Backend {
     },
     async setSettings(next) {
       if (next.autoLockMinutes < 1 || next.autoLockMinutes > 240) throw fail("invalid_setting");
-      settings = { ...next };
+      settings = { ...next, browserIntegration: settings.browserIntegration };
       return { ...settings };
     },
     async touch() {},
@@ -562,6 +616,79 @@ export function createMockBackend(): Backend {
       lockListeners.add(callback);
       return () => lockListeners.delete(callback);
     },
+    async onVaultChanged(callback) {
+      changeListeners.add(callback);
+      return () => changeListeners.delete(callback);
+    },
+    async bridgeStatus() {
+      await delay(40);
+      return bridge();
+    },
+    async setBrowserIntegration(enabled) {
+      await delay();
+      settings = { ...settings, browserIntegration: enabled };
+      if (!enabled) clients = [];
+      return bridge();
+    },
+    async pairingDecision(id, approve) {
+      if (!pending || pending.id !== id) return false;
+      const request = pending;
+      pending = null;
+      if (approve) {
+        clients = [
+          {
+            clientId: `${id.toString(16).padStart(8, "0")}${"0".repeat(24)}`,
+            name: request.clientName,
+            browser: request.browser,
+            extension: request.extension,
+            createdAt: now(),
+            lastUsedAt: null,
+          },
+          ...clients,
+        ];
+      }
+      pairingClosedListeners.forEach((l) => l(id));
+      return true;
+    },
+    async revokeBrowser(clientId) {
+      const before = clients.length;
+      clients = clients.filter((c) => c.clientId !== clientId);
+      if (clients.length === before) throw fail("not_found");
+      return bridge();
+    },
+    async onPairingRequest(callback) {
+      pairingListeners.add(callback);
+      return () => pairingListeners.delete(callback);
+    },
+    async onPairingClosed(callback) {
+      pairingClosedListeners.add(callback);
+      return () => pairingClosedListeners.delete(callback);
+    },
+  };
+
+  // Test hooks: a browser extension asks to pair; a login saved from a
+  // browser.
+  const hooks = window as unknown as { __lkMockPairing?: () => void; __lkMockSavedFromBrowser?: () => void };
+  hooks.__lkMockPairing = requestPairing;
+  hooks.__lkMockSavedFromBrowser = () => {
+    const at = now();
+    items = [
+      ...items,
+      {
+        id: uuid(),
+        title: "example.net",
+        favorite: false,
+        folder: null,
+        tags: [],
+        customFields: [],
+        createdAt: at,
+        updatedAt: at,
+        history: [],
+        content: { type: "login", username: "carol", hasPassword: true, urls: ["https://shop.example.net/"], hasTotp: false, backupCodes: 0 },
+        secrets: { password: "saved-from-browser", backupCodes: [], documentNumbers: [] },
+      },
+    ];
+    changeListeners.forEach((l) => l());
   };
 
   // Test hook: simulate the auto-lock timer.

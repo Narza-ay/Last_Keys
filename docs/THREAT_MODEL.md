@@ -72,8 +72,10 @@ mitigation: ✅ implemented and tested · 📐 designed · ⬜ planned.
 ### Autofill and passkeys
 | Threat | Mitigation | Status |
 |--------|------------|--------|
-| T6 phishing / lookalike domains | Exact origin matching with Public Suffix List, IDN homograph checks, no fuzzy matching by default. | ⬜ Phase 6 |
-| T6 invisible or cross-origin iframes | Never fill cross-origin frames without confirmation; visibility checks. | ⬜ Phase 6 |
+| T6 phishing / lookalike domains | Exact origin matching with the Public Suffix List (private suffixes included), punycode comparison, no fuzzy matching; the page's origin comes from the browser, never from page content; Rust re-checks every fill, copy and update (ADR-0011). | ✅ extension (desktop-connected) |
+| T6 invisible or cross-origin iframes | Frames of another origin filled only after the user's confirmation (enforced in Rust), frames of another site never; hidden, off-screen, disabled and read-only fields never filled; the content script re-checks its origin before writing; no fill on page load. | ✅ extension |
+| Local process impersonating the extension or the desktop (browser bridge) | Native messaging host started only for the listed extension IDs; endpoint in a `0700` directory (named pipe, first instance, remote clients refused on Windows); pairing approved in the desktop with a code; mutual HMAC challenge-response on every connection (no reusable secret on the wire); the extension never sends its proof to an endpoint that failed to prove the key. Same-user malware reading the key on disk stays out of scope (T7). | ✅ desktop + extension |
+| Malicious page abusing the extension | No in-page UI (nothing to click-jack), no web-accessible resource, page messages never accepted (only the extension's own content scripts and pages, identified by the browser); submitted credentials saved only after the user confirms in the popup. | ✅ extension |
 | Passkey assertion for wrong RP | RP ID validated against the calling origin by the browser/OS and re-checked by Last Keys. | ⬜ Phase 5 |
 
 ### Supply chain and releases

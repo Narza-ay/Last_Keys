@@ -21,7 +21,8 @@ There is no official cloud deployment yet; desktop installers are built by CI, u
 | `test` | `cargo test --workspace` (dev and release profiles, server excluded: it needs PostgreSQL) on Linux, Windows and macOS, desktop back end included |
 | `server-tests` | Server, synchronization and CLI end-to-end tests against a PostgreSQL 16 service |
 | `desktop-ui` | Desktop interface: `npm ls` (peers), ESLint (including the no-hard-coded-text rule), TypeScript, Vitest, production build, Playwright in Chromium |
-| `desktop-app` | The real desktop application on Linux through WebDriver, with a real `lk-server` on PostgreSQL |
+| `extension` | Browser extension: `npm ls`, ESLint, TypeScript, Vitest, Chromium and Firefox builds (kept 7 days as artifacts) |
+| `desktop-app` | The real desktop application on Linux through WebDriver, with a real `lk-server` on PostgreSQL; then autofill end to end with Chromium and the extension (native messaging to the real application) |
 | `desktop-bundle` | Unsigned installers on Linux (deb, rpm, AppImage), Windows (MSI, NSIS) and macOS (app, DMG), kept 7 days as artifacts |
 | `compose-smoke` | Builds the server image and the `lk` binary, then runs `scripts/compose-smoke-test.sh`: the real Compose stack with TLS, registration, synchronization, backup, volume destruction, restore and enrollment of a new device |
 | `wasm` | `cargo check` of the portable crates for `wasm32-unknown-unknown` |
@@ -31,7 +32,7 @@ There is no official cloud deployment yet; desktop installers are built by CI, u
 
 `.github/workflows/fuzz.yml` runs every fuzz target nightly (and on demand).
 Dependabot watches Cargo dependencies, GitHub Actions, the Docker base
-images of `infra/` and the npm packages of `apps/desktop` (releases younger
+images of `infra/` and the npm packages of `apps/desktop` and `apps/extension` (releases younger
 than two weeks are not proposed).
 
 ## Planned
@@ -42,6 +43,8 @@ than two weeks are not proposed).
   registry with an SBOM.
 * Desktop installers are built unsigned by CI (M4); signing (Authenticode,
   Apple notarization), MSIX and distribution channels come with the release
-  pipeline. M5: extension packages for the Chrome Web Store, AMO and Brave.
+  pipeline. Extension: unpacked Chromium and Firefox builds are CI artifacts;
+  publication on the Chrome Web Store and AMO (signed packages, final IDs)
+  awaits the owner's decision.
 * Phase 8: signed releases, update mechanism with signature verification,
   reproducible builds as a goal.

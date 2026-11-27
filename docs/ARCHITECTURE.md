@@ -83,7 +83,9 @@ docs/                 specification, architecture, security, ADRs, audit
 | `lk-sync` | M3 | Typed API client, account registration and device enrollment, sync engine (pull/push, conflict copies, rollback detection, full resynchronization) | ✅ |
 | `lk-client` | M4 | Application layer shared by every client: vault lifecycle (create, enroll, unlock), items through edit drafts, view models without secrets, TOTP, account, sync, devices | ✅ |
 | `lk-import` | M6 | NordPass (then Bitwarden, 1Password, CSV) | 📐 |
-| `lk-wasm` | M4/M5 | `wasm-bindgen` bindings for web app and extension | 📐 |
+| `lk-autofill` | M5 | Which stored URL may be used on which page: Public Suffix List (private section included), punycode, ports, schemes | ✅ |
+| `lk-bridge` | M5 | Browser bridge (ADR-0011): frames, requests, pairing material, mutual authentication, endpoint names, native messaging manifests | ✅ |
+| `lk-wasm` | M13 | `wasm-bindgen` bindings for the web app and the standalone extension mode | 📐 |
 | `lk-ffi` | Phase 6 | UniFFI bindings for Kotlin and Swift | 📐 |
 
 | Application | Milestone | Stack | Status |
@@ -91,7 +93,7 @@ docs/                 specification, architecture, security, ADRs, audit
 | `apps/cli` | M2, M3 | Rust (`lk` command) for end-to-end verification and power users | ✅ |
 | `apps/server` | M3 | Rust (axum), PostgreSQL, REST (WebSocket later), Docker Compose | ✅ |
 | `apps/desktop` | M4 | Tauri 2 (Rust back end `lk-desktop` on `lk-client`) + React/TypeScript UI ([ADR-0010](adr/0010-desktop-application.md)) | ✅ |
-| `apps/extension` | M5 | TypeScript, MV3, `lk-wasm` | 📐 |
+| `apps/extension` | M5 | TypeScript, Manifest V3 (Chromium, Firefox), React popup; connected to the desktop through native messaging, no cryptography or vault in the browser ([ADR-0011](adr/0011-browser-extension.md)); standalone mode with `lk-wasm` in M13 | ✅ |
 | `apps/web` | Phase 6 | React + TypeScript + `lk-wasm` | 📐 |
 | `apps/android` | Phase 6 | Kotlin + `lk-ffi` | 📐 |
 | `apps/ios` | Phase 6 | Swift + `lk-ffi` | 📐 |

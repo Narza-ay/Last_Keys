@@ -6,8 +6,9 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use lk_client::{
-    Credential, DeviceId, DeviceView, Field, ItemDraft, ItemId, ItemSummary, ItemView,
-    MasterPassword, Platform, RecoveryKey, SyncSummary, TotpView, Vault, VaultInfo, Zeroizing,
+    AutofillCandidate, AutofillCredentials, Credential, DeviceId, DeviceView, Field, FillTarget,
+    ItemDraft, ItemId, ItemSummary, ItemView, MasterPassword, Platform, RecoveryKey, SaveProposal,
+    SyncSummary, TotpView, Vault, VaultInfo, Zeroizing,
 };
 use lk_generator::{PassphrasePolicy, PasswordPolicy, StrengthLevel};
 use serde::{Deserialize, Serialize};
@@ -166,6 +167,32 @@ fn display(recovery_key: &RecoveryKey) -> UiResult<String> {
         .map_err(|_| UiError::internal())
 }
 
+/// A change of the vault's state that other parts of the application (the
+/// browser bridge) must learn about.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum VaultEvent {
+    /// The vault was locked.
+    Locked,
+    /// The vault was unlocked (or created, or enrolled).
+    Unlocked,
+    /// Items were added or changed outside the user interface.
+    Changed,
+}
+
+/// Receives [`VaultEvent`]s; called with the core's lock held, so it must
+/// only forward them.
+pub type Observer = Box<dyn Fn(VaultEvent) + Send>;
+
+/// The password policy used for passwords generated from the browser.
+const AUTOFILL_PASSWORD: PasswordOptions = PasswordOptions {
+    length: 20,
+    lowercase: true,
+    uppercase: true,
+    digits: true,
+    symbols: true,
+    exclude_ambiguous: false,
+};
+
 /// The desktop back end.
 pub struct DesktopCore {
     paths: Paths,
@@ -174,6 +201,7 @@ pub struct DesktopCore {
     settings: Settings,
     last_activity: Instant,
     clipboard: ClipboardGuard,
+    observer: Option<Observer>,
 }
 
 impl DesktopCore {
@@ -193,7 +221,36 @@ impl DesktopCore {
             settings,
             last_activity: now,
             clipboard: ClipboardGuard::new(clipboard),
+            observer: None,
         }
+    }
+
+    /// Registers the receiver of [`VaultEvent`]s.
+    pub fn set_observer(&mut self, observer: Observer) {
+        self.observer = Some(observer);
+    }
+
+    fn notify(&self, event: VaultEvent) {
+        if let Some(observer) = &self.observer {
+            observer(event);
+        }
+    }
+
+    fn set_vault(&mut self, vault: Vault) {
+        self.vault = Some(vault);
+        self.notify(VaultEvent::Unlocked);
+    }
+
+    /// The paths of the application's files.
+    #[must_use]
+    pub const fn paths(&self) -> &Paths {
+        &self.paths
+    }
+
+    /// Whether the vault is unlocked.
+    #[must_use]
+    pub const fn is_unlocked(&self) -> bool {
+        self.vault.is_some()
     }
 
     fn vault(&self) -> UiResult<&Vault> {
@@ -259,8 +316,11 @@ impl DesktopCore {
     /// Locks: the vault is dropped (keys zeroized) and a copied secret is
     /// removed from the clipboard.
     pub fn lock(&mut self) {
-        self.vault = None;
+        let was_unlocked = self.vault.take().is_some();
         self.clipboard.clear_if_ours();
+        if was_unlocked {
+            self.notify(VaultEvent::Locked);
+        }
     }
 
     // ------------------------------------------------- vault lifecycle
@@ -285,7 +345,7 @@ impl DesktopCore {
             unix_now(),
         )?;
         let shown = display(&created.recovery_key)?;
-        self.vault = Some(created.vault);
+        self.set_vault(created.vault);
         self.touch(now);
         Ok(shown)
     }
@@ -313,7 +373,7 @@ impl DesktopCore {
             self.platform,
             unix_now(),
         )?;
-        self.vault = Some(enrolled.vault);
+        self.set_vault(enrolled.vault);
         self.touch(now);
         Ok(enrolled.received)
     }
@@ -324,10 +384,8 @@ impl DesktopCore {
     /// `no_vault`, `invalid_credentials`.
     pub fn unlock(&mut self, password: &str, now: Instant) -> UiResult<()> {
         let password = master_password(password)?;
-        self.vault = Some(Vault::unlock(
-            &self.paths.vault,
-            &Credential::MasterPassword(&password),
-        )?);
+        let vault = Vault::unlock(&self.paths.vault, &Credential::MasterPassword(&password))?;
+        self.set_vault(vault);
         self.touch(now);
         Ok(())
     }
@@ -339,10 +397,8 @@ impl DesktopCore {
     /// `invalid_recovery_key`, `invalid_credentials`.
     pub fn unlock_with_recovery_key(&mut self, key: &str, now: Instant) -> UiResult<()> {
         let key = recovery_key(key)?;
-        self.vault = Some(Vault::unlock(
-            &self.paths.vault,
-            &Credential::RecoveryKey(&key),
-        )?);
+        let vault = Vault::unlock(&self.paths.vault, &Credential::RecoveryKey(&key))?;
+        self.set_vault(vault);
         self.touch(now);
         Ok(())
     }
@@ -504,6 +560,96 @@ impl DesktopCore {
             entropy_bits: generated.entropy_bits(),
             level: generated.level(),
         })
+    }
+
+    // ---------------------------------------------- autofill (ADR-0011)
+
+    /// Logins that match the top-level page.
+    ///
+    /// # Errors
+    /// `locked`, `ineligible_page`.
+    pub fn autofill_candidates(&self, page_url: &str) -> UiResult<Vec<AutofillCandidate>> {
+        Ok(self.vault()?.autofill_candidates(page_url)?)
+    }
+
+    /// Credentials of one fill (an explicit user action: counts as
+    /// activity).
+    ///
+    /// # Errors
+    /// `locked`, `ineligible_page`, `origin_mismatch`,
+    /// `confirmation_required`, `not_found`, `wrong_item_type`.
+    pub fn autofill_fill(
+        &mut self,
+        id: &ItemId,
+        target: &FillTarget<'_>,
+        now: Instant,
+    ) -> UiResult<AutofillCredentials> {
+        let credentials = self.vault()?.autofill_credentials(id, target, unix_now())?;
+        self.touch(now);
+        Ok(credentials)
+    }
+
+    /// Copies the username, password or TOTP code of a login that matches
+    /// the page (explicit user action).
+    ///
+    /// # Errors
+    /// As [`Self::autofill_fill`]; `clipboard`.
+    pub fn autofill_copy(
+        &mut self,
+        id: &ItemId,
+        page_url: &str,
+        field: Field,
+        now: Instant,
+    ) -> UiResult<CopyResult> {
+        let value = self
+            .vault()?
+            .autofill_field(id, page_url, field, unix_now())?;
+        self.touch(now);
+        self.copy_text(&value, now)
+    }
+
+    /// What to propose for credentials submitted on a page.
+    ///
+    /// # Errors
+    /// `locked`, `ineligible_page`, `invalid_input`.
+    pub fn save_proposal(
+        &self,
+        page_url: &str,
+        username: Option<&str>,
+        password: &str,
+    ) -> UiResult<SaveProposal> {
+        Ok(self.vault()?.save_proposal(page_url, username, password)?)
+    }
+
+    /// Saves submitted credentials, confirmed by the user in the extension.
+    ///
+    /// # Errors
+    /// `locked`, `ineligible_page`, `origin_mismatch`, `invalid_input`.
+    pub fn save_login(
+        &mut self,
+        page_url: &str,
+        username: Option<&str>,
+        password: &str,
+        update: Option<&ItemId>,
+        now: Instant,
+    ) -> UiResult<ItemId> {
+        let id = self
+            .vault_mut()?
+            .save_login(page_url, username, password, update, unix_now())?;
+        self.touch(now);
+        self.notify(VaultEvent::Changed);
+        Ok(id)
+    }
+
+    /// A password for a registration or password-change form.
+    ///
+    /// # Errors
+    /// `locked`.
+    pub fn generate_for_autofill(&mut self, now: Instant) -> UiResult<Zeroizing<String>> {
+        self.vault()?;
+        let generated = self.generate_password(&AUTOFILL_PASSWORD)?;
+        self.touch(now);
+        Ok(Zeroizing::new(generated.value))
     }
 
     // ---------------------------------------------------------- account

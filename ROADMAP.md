@@ -30,7 +30,7 @@ monitoring, P2P sync, documents/attachments, web application, telemetry.
 | M2 | Vault model (logins, notes, cards, identities, TOTP), password/passphrase generator, local encrypted store (SQLite) with offline queue, `lk` CLI for end-to-end verification, HPKE cross-implementation vector | 2, 4 | ✅ Done (KDF device campaign carried over: needs physical devices) |
 | M3 | Server: OPAQUE authentication, device registry, encrypted sync with change log and conflict handling, revocation enforcement, PostgreSQL, Docker Compose self-hosting, backup/restore | 3 | ✅ Done (phase gate partial: V-Y2, V-Y3, V-Y5, V-Y7 carried over, see the log) |
 | M4 | Desktop app (Tauri 2): unlock, vault browsing/editing, generator, TOTP, devices, settings, FR/EN, light/dark/system | 6 | ✅ Done (Linux tested end to end; Windows/macOS built by CI, not yet run on devices) |
-| M5 | Browser extension (Chrome, Brave, Firefox): login-form detection, safe domain matching, fill, save, generate | 6 | ⬜ |
+| M5 | Browser extension (Chrome, Brave, Firefox): login-form detection, safe domain matching, fill, save, generate | 6 | ✅ Done (Linux + Chromium tested end to end; Firefox built, not driven end to end; Brave and Windows/macOS not run) |
 | M6 | NordPass importer (local file, preview, duplicates, report) | 4 | ⬜ |
 | **v0.1** | **MVP release candidate**: regression suite, security review of M1–M6, deployment docs | 8 (partial) | ⬜ |
 | M7 | Device security: biometrics/PIN local unlock, hardware key stores, pairing verification, key rotation on revocation | 5 | ⬜ |
@@ -68,7 +68,7 @@ interoperability with an independent implementation (V-C3), canary test
 proving no plaintext on disk (V-S1), χ² generator test (V-S5). 162 tests.
 
 Carried over: KDF benchmark on the minimum supported Android/iOS devices and
-in browsers (V-C8) — requires hardware and the WASM harness of M4/M5.
+in browsers (V-C8) — requires hardware and the WASM harness (now M13).
 Remaining risks: OPAQUE not yet prototyped; crash-injection tests of the
 store (V-S2) partial (rollback tested, power-loss simulation pending).
 
@@ -126,4 +126,30 @@ Carried over: run the Windows and macOS builds on real devices; lock on
 system sleep/session lock (V-A4); automated accessibility audit (V-U2);
 network calls outside the vault lock; signed installers and updates
 (Phase 8); bundle identifier to confirm with the product domain.
-Next: M5 (browser extension with autofill).
+
+### M5 — 2026-11-27
+Owner validated M4 and chose the extension mode "connected to the desktop"
+(2026-11-26): no key and no vault in the browser; a standalone mode moves
+to M13. Delivered: ADR-0011, `lk-autofill` (origin matching with the Public
+Suffix List including private suffixes, punycode, ports, no https→http
+downgrade), origin-checked autofill operations in `lk-client`, `lk-bridge`
+(frames, requests, pairing material, mutual HMAC challenge-response,
+endpoint names, native messaging manifests), the desktop bridge (local
+socket or named pipe, pairing dialog, paired-browser list and revocation,
+native host registration for Chrome, Chromium, Brave and Firefox, relay mode
+of the executable) and the extension (`apps/extension`, Manifest V3 for
+Chromium and Firefox): popup in French and English, form detection,
+click-to-fill with cross-origin frame confirmation, copy through the
+desktop, save and update proposals, password generation, optional access to
+every site (AUDIT P-9). V-A1 and V-A2 met; V-A3 partial (Chromium on Linux
+automated; Firefox, Brave, Windows and macOS remain).
+
+Fixed during the end-to-end work: a notification loop that closed the
+pairing connection, and a race that lost frame reports (both covered by new
+tests).
+
+Carried over: Firefox driven end to end (needs a WebExtension-capable
+automation), Brave and the Windows/macOS hosts on real machines (manual
+matrix in [TESTING.md](docs/TESTING.md)), store publication and final
+extension IDs (owner decision), in-field suggestions.
+Next: M6 (NordPass importer).

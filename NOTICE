@@ -10,6 +10,14 @@ EFF Large Wordlist for Passphrases
   License: Creative Commons Attribution 3.0 United States (CC BY 3.0 US)
            https://creativecommons.org/licenses/by/3.0/us/
 
+Public Suffix List
+  Compiled into the "psl" crate (https://crates.io/crates/psl, pinned in
+  Cargo.toml) and linked, unmodified, by the clients that match web origins.
+  Source: https://publicsuffix.org/list/public_suffix_list.dat
+  Maintained by the Public Suffix List project (Mozilla Foundation and
+  contributors).
+  License: Mozilla Public License 2.0 (https://mozilla.org/MPL/2.0/)
+
 Mozilla Public License 2.0 components (desktop application)
   The desktop application links the following crates, used unmodified.
   Their source code is available from crates.io at the versions recorded in

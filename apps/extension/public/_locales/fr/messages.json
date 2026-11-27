@@ -1,0 +1,14 @@
+{
+  "extName": {
+    "message": "Last Keys"
+  },
+  "extDescription": {
+    "message": "Remplissez et enregistrez vos identifiants avec l’application Last Keys de cet ordinateur."
+  },
+  "actionTitle": {
+    "message": "Last Keys"
+  },
+  "commandOpen": {
+    "message": "Ouvrir Last Keys"
+  }
+}

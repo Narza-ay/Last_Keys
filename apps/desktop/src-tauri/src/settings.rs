@@ -49,6 +49,9 @@ pub struct Settings {
     pub auto_lock_minutes: u32,
     /// Clear a copied secret from the clipboard after this many seconds.
     pub clipboard_clear_seconds: u32,
+    /// The browser extension may connect (ADR-0011). Off until the user
+    /// turns it on; changed only through its own command.
+    pub browser_integration: bool,
 }
 
 impl Default for Settings {
@@ -58,6 +61,7 @@ impl Default for Settings {
             theme: Theme::System,
             auto_lock_minutes: 5,
             clipboard_clear_seconds: 30,
+            browser_integration: false,
         }
     }
 }
@@ -127,6 +131,7 @@ mod tests {
             theme: Theme::Dark,
             auto_lock_minutes: 15,
             clipboard_clear_seconds: 45,
+            browser_integration: true,
         };
         s.save(&path).unwrap();
         assert_eq!(Settings::load(&path), s);

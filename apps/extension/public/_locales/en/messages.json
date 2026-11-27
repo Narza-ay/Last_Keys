@@ -1,0 +1,18 @@
+{
+  "extName": {
+    "message": "Last Keys",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "Fill and save your logins with the Last Keys application on this computer.",
+    "description": "Store description"
+  },
+  "actionTitle": {
+    "message": "Last Keys",
+    "description": "Toolbar button tooltip"
+  },
+  "commandOpen": {
+    "message": "Open Last Keys",
+    "description": "Keyboard shortcut description"
+  }
+}

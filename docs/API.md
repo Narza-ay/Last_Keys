@@ -65,6 +65,45 @@ backup). A client whose cursor is ahead of `head`, or that sees another
 full resynchronization (`lk sync --reset`), which uploads every local item
 again and keeps differing versions as conflict copies (ADR-0008, "Restore").
 
+## Browser bridge (local, ADR-0011)
+
+**Status: implemented in `apps/desktop` (milestone M5).** Not an HTTP API:
+the protocol between the browser extension and the desktop application,
+through native messaging and the desktop's local endpoint (Unix socket or
+named pipe). Request types are defined in `crates/lk-bridge/src/proto.rs`;
+answers are built in `apps/desktop/src-tauri/src/bridge/session.rs`.
+
+* Frames: 32-bit little-endian length, then a UTF-8 JSON object; 1 MiB at
+  most. Every message has `id` (chosen by the sender, echoed by the answer;
+  `0` for events) and `type`.
+* Errors: `{"id", "type": "error", "code", "message"}` with the desktop's
+  error codes (`locked`, `not_found`, `ineligible_page`, `origin_mismatch`,
+  `confirmation_required`, `invalid_input`, `rate_limited`, …) and the
+  bridge's own: `malformed`, `not_authenticated`, `unknown_client`,
+  `auth_failed`, `pairing_busy`, `pairing_refused`, `pairing_timeout`, and
+  `desktop_unavailable` (sent by the relay when the application cannot be
+  reached).
+* The first frame of a connection is the relay's
+  `{"type": "relay", "caller", "browser", "version"}`; any other first frame
+  closes the connection.
+
+| Request | Before authentication | Answer |
+|---------|-----------------------|--------|
+| `pair {clientName}` | yes | `pairing {code}`, then `paired {clientId, key}` once approved in the desktop (or an error) |
+| `hello {clientId, nonce}` | yes | `challenge {nonce, proof}` (desktop proof, see `lk-bridge` `auth`) or `unknown_client` |
+| `auth {proof}` | after `hello` | `ready {locked, vaultExists, version}`; a wrong proof closes the connection |
+| `status` | no | `status {locked, vaultExists, version}` |
+| `focus` | no | `ok` (the desktop window comes to the front) |
+| `list {pageUrl}` | no | `logins {logins: [{id, title, username, matched, hasPassword, hasTotp, favorite}]}` — the logins of that page only |
+| `fill {itemId, pageUrl, frameUrl, crossOriginConfirmed?}` | no | `credentials {username, password, totp}` after the origin checks |
+| `copy {itemId, pageUrl, field}` | no | `copied {clearsInSeconds}` (`field`: `username`, `password`, `totp`) |
+| `generate` | no | `generated {password}` |
+| `save_check {pageUrl, username?, password}` | no | `proposal {proposal: {action: "new", title, url} \| {action: "update_password", id, title} \| {action: "unchanged", id}}` |
+| `save {pageUrl, username?, password, updateId?}` | no | `saved {itemId}` |
+
+Events (id 0): `{"type": "event", "event": "locked" | "unlocked" | "revoked"}`;
+after `revoked` the connection closes.
+
 ## Planned
 
 WebSocket change notifications (`/v1/events`), e-mail verification at

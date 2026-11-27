@@ -23,6 +23,20 @@ modification times, deletion markers and the queue of changes awaiting
 synchronization. Titles, URLs and every other item field are encrypted.
 Files are created readable by their owner only (Unix).
 
+## Browser extension
+
+The extension (ADR-0011) sends nothing to any server and holds no vault: it
+talks only to the Last Keys desktop application on the same computer,
+through the browser's native messaging. The desktop gives it only the
+logins of the page being filled (title, username) and, for one fill, that
+login's username, password and current two-factor code. Credentials
+submitted on a page are kept in the browser's session memory (cleared when
+the browser closes, five minutes at most) until the user saves or dismisses
+them. With access to every site granted, the extension's script reads the
+forms of the pages visited to detect login fields; it reports nothing about
+them except, to the desktop and only on submission, the submitted username
+and password. No analytics, no remote code.
+
 ## Hosting
 
 Official cloud: European Union, preferably France (decision 4). Third-party

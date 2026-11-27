@@ -11,6 +11,7 @@ use lk_client::{
 };
 use tauri::State;
 
+use crate::bridge::{BridgeService, BridgeStatus};
 use crate::core::{
     AppStatus, CopyResult, DesktopCore, GeneratedView, PassphraseOptions, PasswordOptions,
 };
@@ -46,10 +47,15 @@ pub async fn get_settings(state: State<'_, Shared>) -> UiResult<Settings> {
     run(state, |c| Ok(c.settings())).await
 }
 
-/// Replaces the preferences.
+/// Replaces the preferences (browser integration excepted: it has its own
+/// command, which also registers the browsers).
 #[tauri::command]
-pub async fn set_settings(state: State<'_, Shared>, settings: Settings) -> UiResult<Settings> {
-    run(state, move |c| c.set_settings(settings)).await
+pub async fn set_settings(state: State<'_, Shared>, mut settings: Settings) -> UiResult<Settings> {
+    run(state, move |c| {
+        settings.browser_integration = c.settings().browser_integration;
+        c.set_settings(settings)
+    })
+    .await
 }
 
 /// User activity (postpones auto-lock).
@@ -276,4 +282,51 @@ pub async fn devices(state: State<'_, Shared>) -> UiResult<Vec<DeviceView>> {
 #[tauri::command]
 pub async fn revoke_device(state: State<'_, Shared>, id: DeviceId) -> UiResult<()> {
     run(state, move |c| c.revoke_device(id)).await
+}
+
+/// Browser integration: state, registered browsers, paired extensions.
+#[tauri::command]
+pub async fn bridge_status(bridge: State<'_, Arc<BridgeService>>) -> UiResult<BridgeStatus> {
+    Ok(bridge.status().await)
+}
+
+/// Turns browser integration on or off.
+#[tauri::command]
+pub async fn set_browser_integration(
+    state: State<'_, Shared>,
+    bridge: State<'_, Arc<BridgeService>>,
+    enabled: bool,
+) -> UiResult<BridgeStatus> {
+    run(state, move |c| {
+        let mut settings = c.settings();
+        settings.browser_integration = enabled;
+        c.set_settings(settings).map(|_| ())
+    })
+    .await?;
+    if enabled {
+        bridge.enable().await;
+    } else {
+        bridge.disable().await;
+    }
+    Ok(bridge.status().await)
+}
+
+/// The user's answer to a pairing request.
+#[tauri::command]
+pub async fn bridge_pairing_decision(
+    bridge: State<'_, Arc<BridgeService>>,
+    id: u64,
+    approve: bool,
+) -> UiResult<bool> {
+    Ok(bridge.context().broker.decide(id, approve))
+}
+
+/// Revokes a paired extension.
+#[tauri::command]
+pub async fn revoke_browser(
+    bridge: State<'_, Arc<BridgeService>>,
+    client_id: String,
+) -> UiResult<BridgeStatus> {
+    bridge.context().revoke(&client_id)?;
+    Ok(bridge.status().await)
 }

@@ -6,6 +6,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type {
   AppStatus,
+  BridgeStatus,
   CopyResult,
   DeviceView,
   Field,
@@ -14,6 +15,7 @@ import type {
   ItemSummary,
   ItemView,
   PassphraseOptions,
+  PairingRequestView,
   PasswordOptions,
   Settings,
   SyncSummary,
@@ -53,6 +55,16 @@ export interface Backend {
   revokeDevice(id: string): Promise<void>;
   /** Called when the vault locks by itself (inactivity). */
   onLocked(callback: () => void): Promise<() => void>;
+  /** Called when items changed outside the window (saved from a browser). */
+  onVaultChanged(callback: () => void): Promise<() => void>;
+  bridgeStatus(): Promise<BridgeStatus>;
+  setBrowserIntegration(enabled: boolean): Promise<BridgeStatus>;
+  pairingDecision(id: number, approve: boolean): Promise<boolean>;
+  revokeBrowser(clientId: string): Promise<BridgeStatus>;
+  /** Called when a browser extension asks to pair. */
+  onPairingRequest(callback: (request: PairingRequestView) => void): Promise<() => void>;
+  /** Called when a pairing request ends (answered, expired or cancelled). */
+  onPairingClosed(callback: (id: number) => void): Promise<() => void>;
 }
 
 export const tauriBackend: Backend = {
@@ -89,6 +101,14 @@ export const tauriBackend: Backend = {
   devices: () => invoke("devices"),
   revokeDevice: (id) => invoke("revoke_device", { id }),
   onLocked: (callback) => listen("vault-locked", () => callback()),
+  onVaultChanged: (callback) => listen("vault-changed", () => callback()),
+  bridgeStatus: () => invoke("bridge_status"),
+  setBrowserIntegration: (enabled) => invoke("set_browser_integration", { enabled }),
+  pairingDecision: (id, approve) => invoke("bridge_pairing_decision", { id, approve }),
+  revokeBrowser: (clientId) => invoke("revoke_browser", { clientId }),
+  onPairingRequest: (callback) =>
+    listen<PairingRequestView>("bridge-pairing", (event) => callback(event.payload)),
+  onPairingClosed: (callback) => listen<number>("bridge-pairing-closed", (event) => callback(event.payload)),
 };
 
 /** The back end of this build. */

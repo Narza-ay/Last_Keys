@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { Backend } from "./api/backend";
 import type { AppStatus, Settings } from "./api/types";
 import { Logo } from "./components/Icon";
+import { PairingPrompt } from "./components/PairingPrompt";
 import { I18nProvider, makeI18n, resolveLocale } from "./i18n";
 import { Onboarding } from "./screens/Onboarding";
 import { Shell } from "./screens/Shell";
@@ -92,6 +93,7 @@ export function App({ backend }: { backend: Backend }) {
         ) : (
           <Shell />
         )}
+        {status.vaultExists ? <PairingPrompt /> : null}
       </AppProvider>
     </I18nProvider>
   );

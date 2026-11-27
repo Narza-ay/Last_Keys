@@ -1,6 +1,6 @@
 # Last Keys desktop application (Windows, macOS, Linux)
 
-**Status: implemented (milestone M4).** Tested end to end on Linux
+**Status: implemented (milestones M4, M5).** Tested end to end on Linux
 (the real application, through WebDriver); built and packaged by CI on
 Windows and macOS, not yet tested on physical Windows or macOS machines
 (see [docs/PLATFORM_COMPATIBILITY.md](../../docs/PLATFORM_COMPATIBILITY.md)).
@@ -27,6 +27,12 @@ light, dark and system themes.
 * Registration on a server, automatic synchronization (on unlock, after
   changes, every 5 minutes), full resynchronization after a server restore.
 * Devices of the account, verified with the account key; revocation.
+* Browser extension (ADR-0011): when "Allow the browser extension" is on,
+  the application registers its native messaging host with Chrome, Chromium,
+  Brave and Firefox, serves a local endpoint, asks before pairing an
+  extension (same code on both sides), lists paired extensions and revokes
+  them. Started by a browser with the extension's arguments, the executable
+  only relays messages (no window). See [apps/extension](../extension).
 * Settings: language, theme, auto-lock delay, clipboard delay, master
   password change, recovery key replacement, information about the vault.
 
@@ -79,6 +85,6 @@ Installers are not signed yet (release pipeline, Phase 8).
 ## Not yet
 
 Locking on system sleep or session lock, biometric unlock and hardware key
-storage (M7), autofill (browser extension, M5), NordPass import (M6),
+storage (M7), NordPass import (M6),
 attachments (M12), single-instance enforcement, signed installers and
 automatic updates.
