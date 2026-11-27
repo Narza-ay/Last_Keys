@@ -74,7 +74,7 @@ url = { version = "2.5.9" }
 percent-encoding = { version = "2.3.2" }
 # Public Suffix List compiled into code (list data under MPL-2.0, see NOTICE);
 # pinned exactly: each release embeds a new snapshot of the list.
-psl = { version = "=2.1.252" }
+psl = { version = "=2.1.262" }
 idna = { version = "1.1.0" }
 
 # General
