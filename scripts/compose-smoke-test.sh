@@ -62,7 +62,14 @@ compose up -d
 wait_healthy
 
 step "Health through Caddy (TLS, internal CA for localhost)"
-health="$(curl -sfk --resolve localhost:18443:127.0.0.1 https://localhost:18443/v1/health)"
+# Caddy has no health check: it may still be issuing its internal
+# certificate right after start. Retry for up to 30 s.
+health=""
+for _ in $(seq 1 30); do
+  health="$(curl -sfk --resolve localhost:18443:127.0.0.1 https://localhost:18443/v1/health || true)"
+  [[ -n "$health" ]] && break
+  sleep 1
+done
 [[ "$health" == *'"status":"ok"'* ]] || fail "unexpected health response: $health"
 echo "$health"
 [[ "$(compose exec -T server id -u)" == 10001 ]] || fail "server does not run as the unprivileged user"

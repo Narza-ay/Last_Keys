@@ -7,3 +7,6 @@ infra/backups/
 infra/.env
 **/*.lkvault
 .git/
+**/node_modules/
+apps/desktop/dist/
+apps/extension/dist/
