@@ -508,9 +508,17 @@ async fn one_server_per_endpoint_and_clean_stop() {
             0o700
         );
     }
-    // A socket left behind by a crashed instance is replaced.
-    let restarted = server::start(Arc::clone(&s.ctx), endpoint(s.dir.path())).await;
-    assert!(restarted.is_ok());
+    // The endpoint can be served again (a socket left behind is replaced;
+    // Windows may keep the closed session's pipe instance for a moment).
+    let mut restarted = server::start(Arc::clone(&s.ctx), endpoint(s.dir.path())).await;
+    for _ in 0..40 {
+        if restarted.is_ok() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        restarted = server::start(Arc::clone(&s.ctx), endpoint(s.dir.path())).await;
+    }
+    assert!(restarted.is_ok(), "{:?}", restarted.err());
 }
 
 /// Native messaging frames on the relay's standard streams.

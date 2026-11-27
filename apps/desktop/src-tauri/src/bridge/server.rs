@@ -94,10 +94,22 @@ pub async fn start(ctx: Arc<BridgeContext>, endpoint: Endpoint) -> io::Result<Se
         Endpoint::Pipe(name) => {
             use tokio::net::windows::named_pipe::ServerOptions;
             let name = name.clone();
+            // Windows answers "access denied" when another process already
+            // serves this pipe: report it as the address being in use.
             let mut server = ServerOptions::new()
                 .first_pipe_instance(true)
                 .reject_remote_clients(true)
-                .create(&name)?;
+                .create(&name)
+                .map_err(|e| {
+                    if e.kind() == io::ErrorKind::PermissionDenied {
+                        io::Error::new(
+                            io::ErrorKind::AddrInUse,
+                            "another instance of Last Keys serves the browser bridge",
+                        )
+                    } else {
+                        e
+                    }
+                })?;
             let active = Arc::new(AtomicUsize::new(0));
             tokio::spawn(async move {
                 loop {
