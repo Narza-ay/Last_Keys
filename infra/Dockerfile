@@ -5,7 +5,7 @@
 # Behind a TLS-intercepting proxy, pass its CA as a BuildKit secret:
 #   docker build --secret id=build_ca,src=/path/to/ca.pem ...
 
-FROM rust:1.97.0-slim-trixie AS builder
+FROM rust:1.100.0-slim-trixie AS builder
 WORKDIR /src
 # The image ships exactly the pinned toolchain; do not let rust-toolchain.toml
 # trigger component downloads.
